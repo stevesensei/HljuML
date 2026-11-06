@@ -3,6 +3,7 @@ using System;
 using HljuML.App.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using TKCode.Arc;
 
 namespace HljuML.App;
 
@@ -40,5 +41,10 @@ class Program
             .WithDeveloperTools()
 #endif
             .WithInterFont()
+            .UseArc(arc => arc
+                .UseArcControls()
+                .WithTheme(theme => theme
+                    .Appearance(ArcAppearance.Light)
+                    .Accent(ArcAccentPreset.Blue)))
             .LogToTrace();
 }
