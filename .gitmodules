@@ -1,0 +1,3 @@
+[submodule "LibColorMC"]
+	path = LibColorMC
+	url = https://github.com/Coloryr/ColorMC.git

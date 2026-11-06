@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="HljuML.App/HljuML.App.csproj" />
+  <Project Path="HljuML.Core/HljuML.Core.csproj" />
+  <Project Path="HljuML.Online/HljuML.Online.csproj" />
+  <Project Path="HljuML.Shared/HljuML.Shared.csproj" />
+  <Project Path="LibColorMC/src/ColorMC.Core/ColorMC.Core.csproj" />
+</Solution>
