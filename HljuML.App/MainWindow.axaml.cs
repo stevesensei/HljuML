@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
@@ -7,6 +8,7 @@ using Avalonia.Interactivity;
 using HljuML.App.Core;
 using HljuML.App.Views;
 using HljuML.Core.GamePlay;
+using HljuML.Core.Model.Entity;
 using HljuML.Shared.Model;
 using Microsoft.Extensions.DependencyInjection;
 using TKCode.Arc;
@@ -27,6 +29,13 @@ public partial class MainWindow : Window
     internal MainWindow(IServiceScopeFactory scopes) : this() => _scopes = scopes;
 
     public IList<Control> HomeCards => HomeFeed.Children;
+
+    protected override async void OnOpened(EventArgs e)
+    {
+        base.OnOpened(e);
+        if (DataContext is MainViewModel viewModel)
+            await viewModel.RefreshLaunchOptionsAsync();
+    }
 
     private void OnHomeClicked(object? sender, RoutedEventArgs e) => ShowPage(HomePage, HomeButton);
 
@@ -67,14 +76,40 @@ public partial class MainWindow : Window
             Width = Math.Clamp(Bounds.Width - 32, 540, 860),
             Height = Math.Clamp(Bounds.Height - 32, 420, 552)
         };
-        AccountScrim.IsVisible = true;
+        var selectedProfileId = await ShowSelectionDialog<Guid?>(accounts);
+        if (DataContext is MainViewModel viewModel)
+            await viewModel.RefreshLaunchOptionsAsync(selectedProfileId);
+    }
+
+    private async void OnChooseInstanceClicked(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel { CanChangeLaunchSelection: true } viewModel)
+            return;
+
+        await viewModel.RefreshLaunchOptionsAsync();
+        if (!IsVisible)
+            return;
+
+        var picker = new InstancePickerWindow(viewModel.AvailableInstances, viewModel.SelectedInstanceId,
+            viewModel.LaunchOptionsError)
+        {
+            Width = Math.Clamp(Bounds.Width - 32, 520, 880),
+            Height = Math.Clamp(Bounds.Height - 32, 400, 552)
+        };
+        if (await ShowSelectionDialog<GameInstanceData?>(picker) is { } selected)
+            viewModel.SelectInstance(selected);
+    }
+
+    private async Task<TResult> ShowSelectionDialog<TResult>(Window window)
+    {
+        SelectionScrim.IsVisible = true;
         try
         {
-            await accounts.ShowDialog(this);
+            return await window.ShowDialog<TResult>(this);
         }
         finally
         {
-            AccountScrim.IsVisible = false;
+            SelectionScrim.IsVisible = false;
         }
     }
 

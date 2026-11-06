@@ -47,7 +47,7 @@ public partial class AccountWindow : Window
 
     public AccountWindow()
     {
-        using var image = AssetLoader.Open(new Uri("avares://HljuML.App/Assets/player-placeholder.png"));
+        using var image = AssetLoader.Open(new Uri(PlayerSkinAvatar.DefaultSource));
         _defaultAvatar = new Bitmap(image);
         InitializeComponent();
         DataContext = this;
@@ -130,6 +130,12 @@ public partial class AccountWindow : Window
     }
 
     private void OnCloseClicked(object? sender, RoutedEventArgs e) => Close();
+
+    private void OnUseProfileClicked(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Control { DataContext: AccountProfileRow profile })
+            Close(profile.Id);
+    }
 
     private void OnAddServerClicked(object? sender, RoutedEventArgs e)
     {
@@ -452,23 +458,18 @@ public partial class AccountWindow : Window
 
     private async Task LoadAvatar(PlayerProfile profile, AccountProfileRow row, CancellationToken token)
     {
-        try
+        if (await PlayerSkinAvatar.LoadAsync(profile, token) is not { } avatar)
+            return;
+
+        var index = Profiles.IndexOf(row);
+        if (token.IsCancellationRequested || index < 0)
         {
-            var path = await PlayerProfileService.DownloadProfileSkin(profile);
-            if (token.IsCancellationRequested || path is null || PlayerSkinAvatar.FromSkin(path) is not { } avatar)
-                return;
-
-            var index = Profiles.IndexOf(row);
-            if (index < 0)
-            {
-                avatar.Dispose();
-                return;
-            }
-
-            _avatars.Add(avatar);
-            Profiles[index] = row with { Avatar = avatar };
+            avatar.Dispose();
+            return;
         }
-        catch (Exception ex) when (ex is IOException or ArgumentException or UnauthorizedAccessException) { }
+
+        _avatars.Add(avatar);
+        Profiles[index] = row with { Avatar = avatar };
     }
 
     private void ClearErrors()

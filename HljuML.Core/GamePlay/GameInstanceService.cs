@@ -1,79 +1,101 @@
-﻿using System.Text;
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.ComponentModel;
+using System.Data.Common;
 using ColorMC.Core;
 using ColorMC.Core.Config;
 using ColorMC.Core.Game;
-using ColorMC.Core.Helpers;
 using ColorMC.Core.LaunchPath;
 using ColorMC.Core.Net;
 using ColorMC.Core.Objs;
-using ColorMC.Core.Objs.Login;
+using HljuML.Core.GamePlay.Auth;
+using HljuML.Core.Infrastructure.Storage;
+using HljuML.Core.Model.Entity;
 using HljuML.Shared.Model;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace HljuML.Core.GamePlay;
 
-public sealed class GameInstanceService: IHostedService
+public sealed class GameInstanceService(IServiceScopeFactory scopeFactory, ILogger<GameInstanceService> logger) : IHostedService
 {
     private readonly ConcurrentDictionary<Guid, RunningProcess> _running = new();
     private readonly SemaphoreSlim _launchGate = new(1, 1);
-
-    public string InstanceName { get; } = "Vanilla 26.2";
-
-    public string PlayerName { get; } = "Tester";
-
-    public string AuthenticationMethod => "离线认证";
 
     public event Action? RunningInstancesChanged;
 
     public IReadOnlyList<RunningGameInstance> GetRunningInstances() =>
         _running.Values.Select(process => process.Instance).OrderBy(instance => instance.ProcessId).ToArray();
 
-    /// <summary>
-    /// 启动游戏进程，新项目先使用临时的开发
-    /// </summary>
-    /// <returns></returns>
-    public async Task<ServiceResult<int?>> LaunchGameInstance(CancellationToken stoppingToken)
+    public async Task<IReadOnlyList<GameInstanceData>> GetGameInstances(CancellationToken cancellationToken = default)
+    {
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<HljuMLDbContext>();
+        return await db.GameInstances.AsNoTracking().OrderByDescending(instance => instance.LastLogin)
+            .ThenBy(instance => instance.Name).ThenBy(instance => instance.Id).ToListAsync(cancellationToken);
+    }
+
+    public async Task<ServiceResult<int?>> LaunchGameInstance(Guid profileId, Guid instanceId,
+        CancellationToken stoppingToken = default, IProgress<GameLaunchProgress>? progress = null)
     {
         if (!_launchGate.Wait(0))
-        {
-            return ServiceResult<int?>.FailureResult(null, "正在启动实例，请稍候。");
-        }
+            return ServiceResult<int?>.FailureResult(message: "正在启动实例，请稍候。");
 
         try
         {
-            var game = InstancesPath.GetGameByName(InstanceName)??
-                       await InstancesPath.CreateGameAsync(new()
-                       {
-                           UUID = Guid.NewGuid(),
-                           Name = InstanceName,
-                           Version = "26.2",
-                           Loader = Loaders.Normal,
-                           JvmLocal = "F:\\java\\25\\bin\\java.exe",
-                       }, null);
-            if (game == null)
+            if (_running.ContainsKey(instanceId))
+                return ServiceResult<int?>.FailureResult(message: "该实例已经在运行。");
+
+            progress?.Report(new("正在读取实例和玩家档案"));
+            await using var scope = scopeFactory.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<HljuMLDbContext>();
+            var profiles = scope.ServiceProvider.GetRequiredService<PlayerProfileService>();
+            var instanceData = await db.GameInstances.AsNoTracking()
+                .SingleOrDefaultAsync(item => item.Id == instanceId, stoppingToken);
+            if (instanceData is null || instanceId == Guid.Empty)
+                return ServiceResult<int?>.FailureResult(message: "找不到所选游戏实例。");
+
+            var profileResult = await profiles.GetPlayerProfile(profileId, stoppingToken);
+            if (profileResult.Data is not { } profile)
+                return ServiceResult<int?>.FailureResult(message: profileResult.Message);
+
+            var loginResult = PlayerProfileService.GetLaunchLogin(profile);
+            if (loginResult.Data is not { } login)
+                return ServiceResult<int?>.FailureResult(message: loginResult.Message);
+
+            var gameResult = await ResolveGame(instanceData, progress, stoppingToken);
+            if (gameResult.Data is not { } game)
+                return ServiceResult<int?>.FailureResult(message: gameResult.Message);
+
+            var reporter = progress is null ? null : new GameLaunchReporter(progress);
+            var args = new GameLaunchArg { Auth = login, Gui = reporter };
+            var previousLogin = login.LastLogin;
+            if (reporter is not null)
+                ColorMCCore.Download += reporter.AttachDownload;
+
+            GameHandle? handle;
+            try
             {
-                return ServiceResult<int?>.FailureResult(null,"创建游戏实例失败");
+                stoppingToken.ThrowIfCancellationRequested();
+                handle = await game.StartGameAsync(args, stoppingToken);
+            }
+            finally
+            {
+                if (reporter is not null)
+                    ColorMCCore.Download -= reporter.AttachDownload;
+                if (profile.AuthMethod != AuthMethod.Offline && args.Auth.LastLogin != previousLogin)
+                    await SaveLoginAfterLaunch(profiles, profile, args);
             }
 
-            if (_running.ContainsKey(game.UUID))
+            if (handle is null)
             {
-                return ServiceResult<int?>.FailureResult(null, "该实例已经在运行。");
+                stoppingToken.ThrowIfCancellationRequested();
+                return ServiceResult<int?>.FailureResult(message: "游戏进程未启动。");
             }
 
-            //Auth
-            var auth = new LoginObj()
-            {
-                AuthType = AuthType.Offline,
-                UserName = PlayerName,
-                UUID = HashHelper.GenMd5(Encoding.UTF8.GetBytes(
-                    PlayerName.ToLowerInvariant())),
-                ClientToken = Guid.NewGuid().ToString("N")
-            };
-            var handle = await game.StartGameAsync(new(){Auth = auth}, stoppingToken)
-                         ?? throw new InvalidOperationException("启动未完成");
-            var instance = new RunningGameInstance(game.UUID, handle.Process.Id, game.Name, auth.UserName, AuthenticationMethod);
+            var instance = new RunningGameInstance(instanceId, handle.Process.Id, instanceData.Name, args.Auth.UserName,
+                PlayerProfileService.DescribeAuthentication(profile));
             var running = new RunningProcess(instance, handle);
             handle.Process.Exited += (_, _) => RemoveRunningProcess(running);
             _running[instance.Id] = running;
@@ -81,22 +103,108 @@ public sealed class GameInstanceService: IHostedService
             if (handle.IsExit)
             {
                 RemoveRunningProcess(running);
-                return ServiceResult<int?>.FailureResult(null, "游戏进程在启动后立即退出。");
+                return ServiceResult<int?>.FailureResult(message: "游戏进程在启动后立即退出。");
             }
 
             RunningInstancesChanged?.Invoke();
+            await SaveLastPlayed(db, instanceId, profileId);
             return ServiceResult<int?>.SuccessResult(instance.ProcessId, "游戏实例启动成功");
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            return ServiceResult<int?>.FailureResult(message: "启动已取消。");
+        }
+        catch (LaunchException e)
+        {
+            return ServiceResult<int?>.FailureResult(message: e.State switch
+            {
+                LaunchError.AuthLoginFail => "玩家认证失败，请重新登录。",
+                LaunchError.JavaNotFound or LaunchError.SelectJavaNotFound => "找不到所需的 Java，请配置兼容的运行环境。",
+                LaunchError.DownloadFileError => "游戏文件下载失败，请检查网络后重试。",
+                LaunchError.VersionError => "实例缺少可用的版本或加载器配置。",
+                _ => $"启动失败（{e.State}）。"
+            });
         }
         catch (Exception e)
         {
-            return ServiceResult<int?>.FailureResult(null, $"启动游戏实例时发生错误: {e.Message}");
+            logger.LogError(e, "Failed to launch instance {InstanceId}", instanceId);
+            return ServiceResult<int?>.InternalErrorResult(message: "启动实例时发生错误。");
         }
         finally
         {
             _launchGate.Release();
         }
     }
-    
+
+    private static async Task<ServiceResult<GameSettingObj>> ResolveGame(GameInstanceData instance,
+        IProgress<GameLaunchProgress>? progress, CancellationToken cancellationToken)
+    {
+        if (InstancesPath.GetGame(instance.Id) is { } existing)
+        {
+            return existing.Version == instance.Version && existing.Loader == instance.Loader
+                ? ServiceResult<GameSettingObj>.SuccessResult(existing)
+                : ServiceResult<GameSettingObj>.FailureResult(message: "实例记录与 ColorMC 的版本或加载器配置不一致。");
+        }
+
+        if (instance.Loader != Loaders.Normal)
+            return ServiceResult<GameSettingObj>.FailureResult(message: "请为此加载器准备同 ID 的 ColorMC 实例配置。");
+        if (string.IsNullOrWhiteSpace(instance.Version))
+            return ServiceResult<GameSettingObj>.FailureResult(message: "请填写实例的原版游戏版本。");
+
+        var directory = $"hljuml-{instance.Id:N}";
+        var newGame = new GameSettingObj
+        {
+            UUID = instance.Id,
+            Name = directory,
+            DirName = directory,
+            Version = instance.Version,
+            Loader = instance.Loader
+        };
+        if (Path.Exists(newGame.GetBasePath()) || InstancesPath.Games.Any(item =>
+            string.Equals(item.DirName, directory, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(item.Name, directory, StringComparison.OrdinalIgnoreCase)))
+        {
+            return ServiceResult<GameSettingObj>.FailureResult(message: "实例目录已存在，请检查 ColorMC 实例配置。");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        progress?.Report(new("正在初始化原版实例"));
+        var created = await InstancesPath.CreateGameAsync(newGame, null);
+        return created?.UUID == instance.Id
+            ? ServiceResult<GameSettingObj>.SuccessResult(created)
+            : ServiceResult<GameSettingObj>.FailureResult(message: "无法创建对应的 ColorMC 实例。");
+    }
+
+    private async Task SaveLoginAfterLaunch(PlayerProfileService profiles, PlayerProfile profile, GameLaunchArg args)
+    {
+        try
+        {
+            if (!await profiles.SaveRefreshedLogin(profile, args.Auth, CancellationToken.None))
+                logger.LogWarning("Could not save refreshed login for profile {ProfileId}", profile.Id);
+        }
+        catch (DbException e)
+        {
+            logger.LogWarning(e, "Could not save refreshed login for profile {ProfileId}", profile.Id);
+        }
+    }
+
+    private async Task SaveLastPlayed(HljuMLDbContext db, Guid instanceId, Guid profileId)
+    {
+        try
+        {
+            var playedAt = DateTime.UtcNow;
+            await db.GameInstances.Where(item => item.Id == instanceId)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(item => item.LastLogin, playedAt)
+                    .SetProperty(item => item.LastUsedPlayerId, item =>
+                        db.PlayerProfiles.Any(profile => profile.Id == profileId) ? profileId : item.LastUsedPlayerId));
+        }
+        catch (DbException e)
+        {
+            logger.LogWarning(e, "Could not save last played data for instance {InstanceId}", instanceId);
+        }
+    }
+
     public ServiceResult<object> StopGameInstance(RunningGameInstance instance)
     {
         if (!_running.TryGetValue(instance.Id, out var running) || !ReferenceEquals(running.Instance, instance))

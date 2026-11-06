@@ -141,7 +141,7 @@
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="local:AccountProfileRow">
                                         <Border Classes="account-row">
-                                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{arc:ArcDesignTokenResource Space3}">
+                                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="{arc:ArcDesignTokenResource Space3}">
                                                 <arc:Avatar DisplayName="{Binding Name}" Source="{Binding Avatar}"
                                                             Size="Large" VerticalAlignment="Center" />
                                                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
@@ -150,6 +150,9 @@
                                                     <TextBlock Classes="account-secondary" Text="{Binding Details}" TextTrimming="CharacterEllipsis"
                                                                ToolTip.Tip="{Binding Details}" />
                                                 </StackPanel>
+                                                <arc:Button Grid.Column="2" Content="使用" Variant="Secondary" Size="Small"
+                                                            VerticalAlignment="Center" Click="OnUseProfileClicked"
+                                                            AutomationProperties.Name="{Binding Name, StringFormat='使用 {0}'}" />
                                             </Grid>
                                         </Border>
                                     </DataTemplate>

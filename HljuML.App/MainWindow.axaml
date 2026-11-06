@@ -118,15 +118,15 @@
                     <StackPanel x:Name="HomePage" Spacing="20">
                         <StackPanel Spacing="4">
                             <TextBlock Classes="heading" FontSize="{arc:ArcDesignTokenResource Type3XL}"
-                                       Text="{Binding PlayerName, StringFormat='你好，{0}', FallbackValue='你好，Tester'}"
+                                       Text="{Binding PlayerName, StringFormat='你好，{0}', FallbackValue='你好'}"
                                        TextWrapping="Wrap" />
                             <TextBlock Classes="secondary" Text="从这里开始你的 Minecraft 冒险。" TextWrapping="Wrap" />
                         </StackPanel>
 
                         <layout:MasonryPanel x:Name="HomeFeed" MinimumColumnWidth="260" MaximumColumns="3" Spacing="16">
                             <arc:Card layout:MasonryPanel.ColumnSpan="2"
-                                      Title="{Binding InstanceName, FallbackValue='Vanilla 26.2'}"
-                                      Description="当前开发测试实例">
+                                      Title="{Binding InstanceName, FallbackValue='选择实例'}"
+                                      Description="{Binding InstanceVersion}">
                                 <arc:Card.Media>
                                     <Border MinHeight="116" Padding="20" Background="{StaticResource HeroBrush}">
                                         <Grid ColumnDefinitions="*,Auto">
@@ -135,7 +135,8 @@
                                                 <TextBlock Classes="heading" Text="Minecraft"
                                                            FontSize="{arc:ArcDesignTokenResource Type2XL}" />
                                             </StackPanel>
-                                            <Border Grid.Column="1" Classes="instance-icon" Width="64" Height="64" />
+                                            <Border Grid.Column="1" Classes="instance-icon" Width="64" Height="64"
+                                                    IsVisible="{Binding HasSelectedInstance}" />
                                         </Grid>
                                     </Border>
                                 </arc:Card.Media>
@@ -189,7 +190,6 @@
                             <arc:Card Title="下载队列" Description="下载进度区域 · 占位" />
                             <arc:Card Title="最近游玩" Description="游玩记录区域 · 占位" />
                             <arc:Card Title="Minecraft 资讯" Description="游戏更新与公告 · 占位" />
-                            <arc:Card Title="快捷提示" Description="启动按钮会使用底部启动条显示的当前测试实例。" />
                         </layout:MasonryPanel>
                     </StackPanel>
 
@@ -206,29 +206,36 @@
             </ScrollViewer>
 
             <Border Grid.Row="2" Classes="floating" Margin="0,8,0,16" MaxWidth="1040">
-                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
+                <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
                     <arc:Button x:Name="AccountButton" Variant="Ghost" Size="Large" Click="OnAccountClicked"
                                 HorizontalAlignment="Left" VerticalAlignment="Center"
+                                IsEnabled="{Binding CanChangeLaunchSelection}"
                                 AutomationProperties.Name="打开账户管理" ToolTip.Tip="账户管理">
                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="{arc:ArcDesignTokenResource Space3}">
                             <arc:Avatar Size="Large" VerticalAlignment="Center"
-                                        DisplayName="{Binding PlayerName, FallbackValue=Tester}"
-                                        Source="avares://HljuML.App/Assets/player-placeholder.png" />
+                                        DisplayName="{Binding PlayerName, FallbackValue='选择玩家'}"
+                                        Source="{Binding PlayerAvatar, FallbackValue='avares://HljuML.App/Assets/player-placeholder.png'}" />
                             <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
-                                <TextBlock Classes="heading" Text="{Binding PlayerName, FallbackValue=Tester}"
+                                <TextBlock Classes="heading" Text="{Binding PlayerName, FallbackValue='选择玩家'}"
                                            TextTrimming="CharacterEllipsis" />
-                                <TextBlock Classes="secondary" Text="{Binding AuthenticationMethod, FallbackValue='离线认证'}"
+                                <TextBlock Classes="secondary" Text="{Binding AuthenticationMethod, FallbackValue='未选择档案'}"
                                            TextTrimming="CharacterEllipsis" />
                             </StackPanel>
                             <arc:ArcGlyph Grid.Column="2" Size="14" VerticalAlignment="Center" IsHitTestVisible="False"
                                           Data="M 6,9 L 12,15 L 18,9" />
                         </Grid>
                     </arc:Button>
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                        <Border Classes="instance-icon" Width="36" Height="36" />
-                        <TextBlock Classes="heading" Text="{Binding InstanceName, FallbackValue='Vanilla 26.2'}"
-                                   MaxWidth="144" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                    </StackPanel>
+                    <arc:Button Grid.Column="1" Variant="Ghost" Size="Medium" VerticalAlignment="Center"
+                                Click="OnChooseInstanceClicked" IsEnabled="{Binding CanChangeLaunchSelection}"
+                                AutomationProperties.Name="选择游戏实例" ToolTip.Tip="{Binding InstanceName}">
+                        <StackPanel Orientation="Horizontal" Spacing="{arc:ArcDesignTokenResource Space2}">
+                            <Border Classes="instance-icon" Width="36" Height="36" IsVisible="{Binding HasSelectedInstance}" />
+                            <TextBlock Classes="heading" Text="{Binding InstanceName, FallbackValue='选择实例'}"
+                                       MaxWidth="128" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            <arc:ArcGlyph Size="14" VerticalAlignment="Center" IsHitTestVisible="False"
+                                          IsVisible="{Binding HasSelectedInstance}" Data="M 6,9 L 12,15 L 18,9" />
+                        </StackPanel>
+                    </arc:Button>
                     <arc:Button Grid.Column="2" VerticalAlignment="Center" MinWidth="112" Size="Medium"
                                 Click="OnLaunchClicked" FocusAdorner="{x:Null}"
                                 IsEnabled="{Binding CanLaunchGame, FallbackValue=False}"
@@ -236,6 +243,11 @@
                                 ToolTip.Tip="{Binding LaunchError}">
                         <TextBlock Text="{Binding LaunchLabel, FallbackValue='启动游戏'}" />
                     </arc:Button>
+                    <TextBlock Grid.Row="1" Grid.ColumnSpan="3" Margin="0,2,0,0" Classes="secondary"
+                               FontSize="{arc:ArcDesignTokenResource TypeXS}" HorizontalAlignment="Stretch"
+                               TextAlignment="Right" TextTrimming="CharacterEllipsis"
+                               IsVisible="{Binding HasLaunchStatus}" Text="{Binding LaunchStatus}"
+                               ToolTip.Tip="{Binding LaunchStatus}" AutomationProperties.LiveSetting="Polite" />
                 </Grid>
             </Border>
         </Grid>
@@ -250,7 +262,7 @@
             <Border Classes="resize-grip" Grid.Row="2" Grid.Column="1" WindowDecorationProperties.ElementRole="ResizeS" />
             <Border Classes="resize-grip" Grid.Row="2" Grid.Column="2" WindowDecorationProperties.ElementRole="ResizeSE" />
         </Grid>
-        <Border x:Name="AccountScrim" IsVisible="False" IsHitTestVisible="False"
+        <Border x:Name="SelectionScrim" IsVisible="False" IsHitTestVisible="False"
                 CornerRadius="{Binding #WindowFrame.CornerRadius}"
                 Background="{arc:ArcDesignTokenResource Scrim}" />
     </Grid>

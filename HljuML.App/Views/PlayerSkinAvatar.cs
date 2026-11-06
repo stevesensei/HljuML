@@ -1,10 +1,31 @@
+using System;
+using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
+using HljuML.Core.GamePlay.Auth;
+using HljuML.Core.Model.Entity;
 using SkiaSharp;
 
 namespace HljuML.App.Views;
 
 internal static class PlayerSkinAvatar
 {
+    internal const string DefaultSource = "avares://HljuML.App/Assets/player-placeholder.png";
+
+    internal static async Task<Bitmap?> LoadAsync(PlayerProfile profile, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var path = await PlayerProfileService.DownloadProfileSkin(profile);
+            return path is not null && !cancellationToken.IsCancellationRequested ? FromSkin(path) : null;
+        }
+        catch (Exception ex) when (ex is IOException or ArgumentException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
     internal static Bitmap? FromSkin(string path)
     {
         using var image = CropHead(path);

@@ -1,5 +1,6 @@
 ﻿using System.Text.Json;
 using System.Net.Mail;
+using System.Text;
 using ColorMC.Core.Game;
 using ColorMC.Core.GuiHandle;
 using ColorMC.Core.Helpers;
@@ -111,6 +112,44 @@ public class PlayerProfileService(HljuMLDbContext db, AuthServerService authServ
 
         return (await PlayerSkinAPI.DownloadSkinAsync(login)).Skin;
     }
+
+    public static string DescribeAuthentication(PlayerProfile profile) => profile.AuthMethod switch
+    {
+        AuthMethod.Offline => "离线认证",
+        AuthMethod.Mojang => "微软账户",
+        _ => profile.CustomAuthServer?.Name ?? "外置登录"
+    };
+
+    internal static ServiceResult<LoginObj> GetLaunchLogin(PlayerProfile profile)
+    {
+        if (string.IsNullOrWhiteSpace(profile.PlayerName))
+            return ServiceResult<LoginObj>.FailureResult(message: "玩家档案缺少玩家名。");
+
+        if (profile.AuthMethod == AuthMethod.Offline)
+        {
+            return ServiceResult<LoginObj>.SuccessResult(new LoginObj
+            {
+                AuthType = AuthType.Offline,
+                UserName = profile.PlayerName,
+                UUID = HashHelper.GenMd5(Encoding.UTF8.GetBytes(profile.PlayerName.ToLowerInvariant())),
+                ClientToken = Guid.NewGuid().ToString("N")
+            });
+        }
+
+        var cached = ReadLoginCache(profile);
+        return cached is not null && IsValidLaunchLogin(profile, cached)
+            ? ServiceResult<LoginObj>.SuccessResult(cached)
+            : ServiceResult<LoginObj>.FailureResult(message: "玩家档案缺少有效的登录信息，请重新登录。");
+    }
+
+    private static bool IsValidLaunchLogin(PlayerProfile profile, LoginObj login) => profile.AuthMethod switch
+    {
+        AuthMethod.Custom => AuthServerService.NormalizeServerAddress(profile.CustomAuthServer?.Address) is { } serverUrl
+            && IsValidCustomLogin(login, serverUrl),
+        AuthMethod.Mojang => login.AuthType == AuthType.OAuth && Guid.TryParse(login.UUID, out _)
+            && !string.IsNullOrWhiteSpace(login.UserName) && !string.IsNullOrWhiteSpace(login.AccessToken),
+        _ => false
+    };
 
     /// <summary>
     /// 获取全部Profile
@@ -294,12 +333,24 @@ public class PlayerProfileService(HljuMLDbContext db, AuthServerService authServ
         if (loginResult.Data is not { } login)
             return ServiceResult<PlayerProfile>.FailureResult(message: loginResult.Message);
 
+        return await SaveRefreshedLogin(profile, login, cancellationToken)
+            ? ServiceResult<PlayerProfile>.SuccessResult(profile)
+            : ServiceResult<PlayerProfile>.FailureResult(message: "玩家档案已变更，请重新登录。");
+    }
+
+    internal async Task<bool> SaveRefreshedLogin(PlayerProfile profile, LoginObj login, CancellationToken cancellationToken)
+    {
+        if (!IsValidLaunchLogin(profile, login))
+            return false;
+
+        var address = profile.CustomAuthServer?.Address;
         var cache = JsonSerializer.Serialize(login);
         var hash = HashHelper.GenSha256(cache);
         var updated = await db.PlayerProfiles
-            .Where(item => item.Id == profile.Id && item.AuthMethod == AuthMethod.Custom
+            .Where(item => item.Id == profile.Id && item.AuthMethod == profile.AuthMethod
                 && item.AuthServerId == profile.AuthServerId && item.PlayerName == profile.PlayerName
-                && item.CustomAuthServer!.Address == address && item.LoginCache == profile.LoginCache
+                && (profile.AuthMethod != AuthMethod.Custom || item.CustomAuthServer!.Address == address)
+                && item.LoginCache == profile.LoginCache
                 && item.LoginCacheHash == profile.LoginCacheHash)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(item => item.PlayerName, login.UserName)
@@ -307,12 +358,12 @@ public class PlayerProfileService(HljuMLDbContext db, AuthServerService authServ
                 .SetProperty(item => item.LoginCacheHash, hash), cancellationToken);
 
         if (updated == 0)
-            return ServiceResult<PlayerProfile>.FailureResult(message: "玩家档案已变更，请重新登录。");
+            return false;
 
         profile.PlayerName = login.UserName;
         profile.LoginCache = cache;
         profile.LoginCacheHash = hash;
-        return ServiceResult<PlayerProfile>.SuccessResult(profile);
+        return true;
     }
 
     private static async Task<ServiceResult<LoginObj>> AuthenticateCustom(
@@ -348,14 +399,19 @@ public class PlayerProfileService(HljuMLDbContext db, AuthServerService authServ
     /// <returns></returns>
     private static LoginObj? ReadCachedLogin(PlayerProfile profile, string serverUrl)
     {
+        var login = ReadLoginCache(profile);
+        return login is not null && IsValidCustomLogin(login, serverUrl) ? login : null;
+    }
+
+    private static LoginObj? ReadLoginCache(PlayerProfile profile)
+    {
         if (profile.LoginCache is not { Length: > 0 } cache ||
             !string.Equals(HashHelper.GenSha256(cache), profile.LoginCacheHash, StringComparison.OrdinalIgnoreCase))
             return null;
 
         try
         {
-            var login = JsonSerializer.Deserialize<LoginObj>(cache);
-            return login is not null && IsValidCustomLogin(login, serverUrl) ? login : null;
+            return JsonSerializer.Deserialize<LoginObj>(cache);
         }
         catch (JsonException)
         {

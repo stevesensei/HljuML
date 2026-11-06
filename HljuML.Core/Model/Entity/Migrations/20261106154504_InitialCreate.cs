@@ -1,4 +1,5 @@
 ﻿using System;
+using ColorMC.Core.Objs;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -77,6 +78,19 @@ namespace HljuML.Core.Model.Entity.Migrations
                 name: "IX_PlayerProfiles_AuthServerId",
                 table: "PlayerProfiles",
                 column: "AuthServerId");
+
+            migrationBuilder.InsertData(
+                table: "GameInstances",
+                columns: new[] { "Id", "Name", "Avatar", "Version", "Loader", "LastLogin" },
+                values: new object[]
+                {
+                    new Guid("728a591d-be79-49f6-96a0-a1e7e630c8b1"),
+                    "原版 26.2（测试）",
+                    string.Empty,
+                    "26.2",
+                    (int)Loaders.Normal,
+                    DateTime.MinValue
+                });
         }
 
         /// <inheritdoc />
