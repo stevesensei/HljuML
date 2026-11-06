@@ -7,7 +7,12 @@ public static class ServiceCollectionExtensions
 {
     public static void AddCommonServices(this IServiceCollection collection)
     {
-        collection.AddHostedService<GameInstanceService>();
         collection.AddSingleton<GameInstanceService>();
+        collection.AddHostedService(services => services.GetRequiredService<GameInstanceService>());
+        collection.AddSingleton<MainViewModel>();
+        collection.AddSingleton(services => new MainWindow
+        {
+            DataContext = services.GetRequiredService<MainViewModel>()
+        });
     }
 }

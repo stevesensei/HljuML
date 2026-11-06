@@ -1,8 +1,10 @@
 ﻿using System.Text;
 using ColorMC.Core;
+using ColorMC.Core.Config;
 using ColorMC.Core.Game;
 using ColorMC.Core.Helpers;
 using ColorMC.Core.LaunchPath;
+using ColorMC.Core.Net;
 using ColorMC.Core.Objs;
 using ColorMC.Core.Objs.Login;
 using HljuML.Shared.Model;
@@ -71,6 +73,13 @@ public sealed class GameInstanceService: IHostedService
         {
             Local = Path.Combine(AppContext.BaseDirectory, "HljuML"),
         });
+        
+        var http = ConfigLoad.Config.Http;
+        http.Source = SourceLocal.BMCLAPI;
+        http.DownloadThread = 8;
+        CoreHttpClient.Source = http.Source;
+        ConfigLoad.Save(); // 保存到 Core 数据目录下的 config.json
+        
         ColorMCCore.Init1();
         
         return Task.CompletedTask;
