@@ -10,4 +10,8 @@
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.14"/>
     </ItemGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\HljuML.Shared\HljuML.Shared.csproj" />
+    </ItemGroup>
+
 </Project>
