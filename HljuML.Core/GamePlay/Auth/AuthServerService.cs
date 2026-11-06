@@ -42,10 +42,19 @@ public sealed class AuthServerService(HljuMLDbContext db)
     public async Task<ServiceResult<CustomAuthServer>> CreateAuthServer(
         string address, CancellationToken cancellationToken = default)
     {
-        var result = await ResolveAuthServer(address, cancellationToken);
-        if (result.Data is not { } server)
-            return result;
+        var result = await GetYggdrasilServerMetadata(address, cancellationToken);
+        return result.Data is { } resolved
+            ? await CreateAuthServer(resolved, cancellationToken)
+            : ServiceResult<CustomAuthServer>.FailureResult(message: result.Message);
+    }
 
+    public async Task<ServiceResult<CustomAuthServer>> CreateAuthServer(
+        ResolvedYggdrasilServer resolved, CancellationToken cancellationToken = default)
+    {
+        if (!resolved.ApiUri.IsAbsoluteUri || ParseServerUri(resolved.ApiUri.AbsoluteUri) is null)
+            return ServiceResult<CustomAuthServer>.FailureResult(message: "请输入有效的 Yggdrasil 服务器地址。");
+
+        var server = ToEntity(resolved);
         server.Id = Guid.NewGuid();
         var entry = db.CustomAuthServers.Add(server);
         try
@@ -57,16 +66,17 @@ public sealed class AuthServerService(HljuMLDbContext db)
             entry.State = EntityState.Detached;
         }
 
-        return result;
+        return ServiceResult<CustomAuthServer>.SuccessResult(server);
     }
 
     public async Task<ServiceResult<CustomAuthServer>> UpdateAuthServer(
         Guid serverId, string address, CancellationToken cancellationToken = default)
     {
-        var result = await ResolveAuthServer(address, cancellationToken);
-        if (result.Data is not { } server)
-            return result;
+        var result = await GetYggdrasilServerMetadata(address, cancellationToken);
+        if (result.Data is not { } resolved)
+            return ServiceResult<CustomAuthServer>.FailureResult(message: result.Message);
 
+        var server = ToEntity(resolved);
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var existing = await GetAuthServer(serverId, cancellationToken);
         if (existing.Data is not { } previous)
@@ -88,7 +98,7 @@ public sealed class AuthServerService(HljuMLDbContext db)
 
         await transaction.CommitAsync(cancellationToken);
         server.Id = serverId;
-        return result;
+        return ServiceResult<CustomAuthServer>.SuccessResult(server);
     }
 
     public async Task<ServiceResult<CustomAuthServer>> DeleteAuthServer(
@@ -164,24 +174,17 @@ public sealed class AuthServerService(HljuMLDbContext db)
     internal static string? NormalizeServerAddress(string? address) =>
         ParseServerUri(address)?.AbsoluteUri.TrimEnd('/');
 
-    private async Task<ServiceResult<CustomAuthServer>> ResolveAuthServer(
-        string address, CancellationToken cancellationToken)
+    private static CustomAuthServer ToEntity(ResolvedYggdrasilServer resolved)
     {
-        var result = await GetYggdrasilServerMetadata(address, cancellationToken);
-        if (result.Data is not { } resolved)
-            return ServiceResult<CustomAuthServer>.FailureResult(message: result.Message);
-
-        var meta = resolved.Metadata.Meta;
-        var name = meta?.ServerName?.Trim();
-        var register = meta?.Links?.Register;
-        return ServiceResult<CustomAuthServer>.SuccessResult(new CustomAuthServer
+        var register = resolved.Metadata.Meta?.Links?.Register;
+        return new CustomAuthServer
         {
-            Name = string.IsNullOrEmpty(name) ? resolved.ApiUri.Host : name,
+            Name = resolved.DisplayName,
             Address = resolved.ApiUri.AbsoluteUri.TrimEnd('/'),
             RegisterAddress = !string.IsNullOrWhiteSpace(register)
                 && Uri.TryCreate(resolved.ApiUri, register.Trim(), out var registerUri)
                 && IsWebUri(registerUri) ? registerUri.AbsoluteUri : string.Empty
-        });
+        };
     }
 
     private static Uri? ParseServerUri(string? address) =>
@@ -193,4 +196,8 @@ public sealed class AuthServerService(HljuMLDbContext db)
         && uri.Host.Length > 0 && uri.UserInfo.Length == 0;
 }
 
-public sealed record ResolvedYggdrasilServer(Uri ApiUri, YggdrasilServerMetadata Metadata);
+public sealed record ResolvedYggdrasilServer(Uri ApiUri, YggdrasilServerMetadata Metadata)
+{
+    public string DisplayName => string.IsNullOrWhiteSpace(Metadata.Meta?.ServerName)
+        ? ApiUri.Host : Metadata.Meta.ServerName.Trim();
+}

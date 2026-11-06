@@ -92,6 +92,9 @@ namespace HljuML.Core.Model.Entity.Migrations
                     b.Property<string>("LoginCacheHash")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("PlayerEmail")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("PlayerName")
                         .IsRequired()
                         .HasColumnType("TEXT");

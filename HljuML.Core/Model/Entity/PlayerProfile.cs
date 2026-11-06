@@ -16,6 +16,7 @@ public class PlayerProfile
     public AuthMethod AuthMethod { get; set; }
     public Guid? AuthServerId { get; set; }
     public string PlayerName { get; set; } = null!;
+    public string? PlayerEmail { get; set; }
     //从LoginObj拿的数据存一份
     public string? LoginCache { get;set; }
     public string? LoginCacheHash { get; set; }

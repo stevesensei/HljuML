@@ -1,11 +1,14 @@
+using System;
 using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using HljuML.App.Core;
+using HljuML.App.Views;
 using HljuML.Core.GamePlay;
 using HljuML.Shared.Model;
+using Microsoft.Extensions.DependencyInjection;
 using TKCode.Arc;
 using ArcButton = TKCode.Arc.Button;
 
@@ -13,11 +16,15 @@ namespace HljuML.App;
 
 public partial class MainWindow : Window
 {
+    private readonly IServiceScopeFactory? _scopes;
+
     public MainWindow()
     {
         InitializeComponent();
         PropertyChanged += OnWindowPropertyChanged;
     }
+
+    internal MainWindow(IServiceScopeFactory scopes) : this() => _scopes = scopes;
 
     public IList<Control> HomeCards => HomeFeed.Children;
 
@@ -49,6 +56,27 @@ public partial class MainWindow : Window
         WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
 
     private void OnCloseClicked(object? sender, RoutedEventArgs e) => Close();
+
+    private async void OnAccountClicked(object? sender, RoutedEventArgs e)
+    {
+        if (_scopes is null)
+            return;
+
+        var accounts = new AccountWindow(_scopes)
+        {
+            Width = Math.Clamp(Bounds.Width - 32, 540, 860),
+            Height = Math.Clamp(Bounds.Height - 32, 420, 552)
+        };
+        AccountScrim.IsVisible = true;
+        try
+        {
+            await accounts.ShowDialog(this);
+        }
+        finally
+        {
+            AccountScrim.IsVisible = false;
+        }
+    }
 
     private void OnWindowPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
     {

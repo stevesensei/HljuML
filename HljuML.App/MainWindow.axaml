@@ -206,22 +206,30 @@
             </ScrollViewer>
 
             <Border Grid.Row="2" Classes="floating" Margin="0,8,0,16" MaxWidth="1040">
-                <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
-                    <arc:Avatar Size="Large" VerticalAlignment="Center"
-                                DisplayName="{Binding PlayerName, FallbackValue=Tester}"
-                                Source="avares://HljuML.App/Assets/player-placeholder.png" />
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
-                        <TextBlock Classes="heading" Text="{Binding PlayerName, FallbackValue=Tester}"
-                                   TextTrimming="CharacterEllipsis" />
-                        <TextBlock Classes="secondary" Text="{Binding AuthenticationMethod, FallbackValue='离线认证'}"
-                                   TextTrimming="CharacterEllipsis" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
+                    <arc:Button x:Name="AccountButton" Variant="Ghost" Size="Large" Click="OnAccountClicked"
+                                HorizontalAlignment="Left" VerticalAlignment="Center"
+                                AutomationProperties.Name="打开账户管理" ToolTip.Tip="账户管理">
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="{arc:ArcDesignTokenResource Space3}">
+                            <arc:Avatar Size="Large" VerticalAlignment="Center"
+                                        DisplayName="{Binding PlayerName, FallbackValue=Tester}"
+                                        Source="avares://HljuML.App/Assets/player-placeholder.png" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                                <TextBlock Classes="heading" Text="{Binding PlayerName, FallbackValue=Tester}"
+                                           TextTrimming="CharacterEllipsis" />
+                                <TextBlock Classes="secondary" Text="{Binding AuthenticationMethod, FallbackValue='离线认证'}"
+                                           TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                            <arc:ArcGlyph Grid.Column="2" Size="14" VerticalAlignment="Center" IsHitTestVisible="False"
+                                          Data="M 6,9 L 12,15 L 18,9" />
+                        </Grid>
+                    </arc:Button>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                         <Border Classes="instance-icon" Width="36" Height="36" />
                         <TextBlock Classes="heading" Text="{Binding InstanceName, FallbackValue='Vanilla 26.2'}"
                                    MaxWidth="144" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
-                    <arc:Button Grid.Column="3" VerticalAlignment="Center" MinWidth="112" Size="Medium"
+                    <arc:Button Grid.Column="2" VerticalAlignment="Center" MinWidth="112" Size="Medium"
                                 Click="OnLaunchClicked" FocusAdorner="{x:Null}"
                                 IsEnabled="{Binding CanLaunchGame, FallbackValue=False}"
                                 AutomationProperties.Name="{Binding LaunchLabel, FallbackValue='启动游戏'}"
@@ -242,5 +250,8 @@
             <Border Classes="resize-grip" Grid.Row="2" Grid.Column="1" WindowDecorationProperties.ElementRole="ResizeS" />
             <Border Classes="resize-grip" Grid.Row="2" Grid.Column="2" WindowDecorationProperties.ElementRole="ResizeSE" />
         </Grid>
+        <Border x:Name="AccountScrim" IsVisible="False" IsHitTestVisible="False"
+                CornerRadius="{Binding #WindowFrame.CornerRadius}"
+                Background="{arc:ArcDesignTokenResource Scrim}" />
     </Grid>
 </Window>

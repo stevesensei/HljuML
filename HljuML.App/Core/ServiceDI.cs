@@ -25,7 +25,7 @@ public static class ServiceCollectionExtensions
         collection.AddSingleton<GameInstanceService>();
         collection.AddHostedService(services => services.GetRequiredService<GameInstanceService>());
         collection.AddSingleton<MainViewModel>();
-        collection.AddSingleton(services => new MainWindow
+        collection.AddSingleton(services => new MainWindow(services.GetRequiredService<IServiceScopeFactory>())
         {
             DataContext = services.GetRequiredService<MainViewModel>()
         });

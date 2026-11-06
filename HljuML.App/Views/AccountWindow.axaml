@@ -1,0 +1,209 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:arc="https://github.com/AIDotNet/TKCode.Arc"
+        xmlns:local="using:HljuML.App.Views"
+        x:Class="HljuML.App.Views.AccountWindow" x:DataType="local:AccountWindow"
+        Title="账户管理" Width="860" Height="552" MinWidth="540" MinHeight="420"
+        WindowStartupLocation="CenterOwner" WindowDecorations="None"
+        ExtendClientAreaToDecorationsHint="True" ShowInTaskbar="False"
+        Background="Transparent" TransparencyLevelHint="Transparent"
+        TransparencyBackgroundFallback="{arc:ArcDesignTokenResource SurfaceRaised}">
+    <Window.Resources>
+        <StreamGeometry x:Key="MicrosoftGlyph">M3,3 H21 V21 H3 Z M12,3 V21 M3,12 H21</StreamGeometry>
+        <StreamGeometry x:Key="OfflineGlyph">M16,7 A4,4 0 1 1 8,7 A4,4 0 1 1 16,7 M4,21 V19 C4,16.8 5.8,15 8,15 H16 C18.2,15 20,16.8 20,19 V21</StreamGeometry>
+        <StreamGeometry x:Key="ServerGlyph">M3,4 H21 V10 H3 Z M3,14 H21 V20 H3 Z M7,7 H9 M7,17 H9</StreamGeometry>
+        <StreamGeometry x:Key="AddServerGlyph">M12,5 V19 M5,12 H19</StreamGeometry>
+    </Window.Resources>
+    <Window.Styles>
+        <Style Selector="TextBlock.account-heading">
+            <Setter Property="FontSize" Value="{arc:ArcDesignTokenResource TypeLG}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{arc:ArcDesignTokenResource Foreground}" />
+        </Style>
+        <Style Selector="TextBlock.account-secondary">
+            <Setter Property="FontSize" Value="{arc:ArcDesignTokenResource TypeSM}" />
+            <Setter Property="Foreground" Value="{arc:ArcDesignTokenResource TextSecondary}" />
+        </Style>
+        <Style Selector="Border.account-row">
+            <Setter Property="Background" Value="{arc:ArcDesignTokenResource Surface}" />
+            <Setter Property="BorderBrush" Value="{arc:ArcDesignTokenResource BorderSubtle}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="{arc:ArcDesignTokenResource RadiusPanel}" />
+            <Setter Property="Padding" Value="12" />
+        </Style>
+        <Style Selector="Button.account-provider">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="{arc:ArcDesignTokenResource RadiusControl}" />
+            <Setter Property="Padding" Value="8" />
+            <Setter Property="MinHeight" Value="{arc:ArcDesignTokenResource Space10}" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.account-provider:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{arc:ArcDesignTokenResource AccentSubtle}" />
+        </Style>
+    </Window.Styles>
+
+    <Border x:Name="AccountFrame" Background="{arc:ArcDesignTokenResource SurfaceRaised}"
+            BorderBrush="{arc:ArcDesignTokenResource Border}"
+            BorderThickness="1" CornerRadius="{arc:ArcDesignTokenResource RadiusSurface}">
+        <Grid RowDefinitions="Auto,*,Auto">
+            <Border Background="{arc:ArcDesignTokenResource AccentSubtle}" Padding="20,12"
+                    CornerRadius="{arc:ArcDesignTokenResource RadiusSurface}">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{arc:ArcDesignTokenResource Space3}">
+                    <Border Background="Transparent" WindowDecorationProperties.ElementRole="TitleBar">
+                        <TextBlock Classes="account-heading" Text="账户管理" VerticalAlignment="Center"
+                                   IsHitTestVisible="False" />
+                    </Border>
+                    <arc:Button Grid.Column="1" Variant="Ghost" Size="Small" Click="OnCloseClicked"
+                                AutomationProperties.Name="关闭账户管理" ToolTip.Tip="关闭">
+                        <arc:ArcGlyph Size="16" Data="M 6,6 L 18,18 M 18,6 L 6,18" IsHitTestVisible="False" />
+                    </arc:Button>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="1" ColumnSpacing="{arc:ArcDesignTokenResource Space4}" Margin="20,16,20,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="2*" MinWidth="158" MaxWidth="230" />
+                    <ColumnDefinition Width="5*" />
+                </Grid.ColumnDefinitions>
+                <Border Background="{arc:ArcDesignTokenResource SurfaceMuted}"
+                        CornerRadius="{arc:ArcDesignTokenResource RadiusPanel}" Padding="8">
+                    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Spacing="{arc:ArcDesignTokenResource Space1}">
+                            <TextBlock Classes="account-secondary" Text="添加账户" Margin="8,4,0,8" />
+                            <Button Classes="account-provider" IsEnabled="False" AutomationProperties.Name="微软账户">
+                                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{arc:ArcDesignTokenResource Space2}">
+                                    <arc:ArcGlyph Data="{StaticResource MicrosoftGlyph}" Size="18" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1" Text="微软账户" VerticalAlignment="Center" />
+                                </Grid>
+                            </Button>
+                            <Button Classes="account-provider" Click="OnOfflineClicked" AutomationProperties.Name="离线模式">
+                                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{arc:ArcDesignTokenResource Space2}">
+                                    <arc:ArcGlyph Data="{StaticResource OfflineGlyph}" Size="18" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1" Text="离线模式" VerticalAlignment="Center" />
+                                </Grid>
+                            </Button>
+                            <ItemsControl ItemsSource="{Binding AuthServers}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><StackPanel Spacing="{arc:ArcDesignTokenResource Space1}" /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="local:AccountServerRow">
+                                        <Button Classes="account-provider" Click="OnServerClicked"
+                                                AutomationProperties.Name="{Binding Server.Name}">
+                                            <ToolTip.Tip>
+                                                <StackPanel MaxWidth="380" Spacing="{arc:ArcDesignTokenResource Space1}">
+                                                    <TextBlock Text="{Binding Server.Name}" TextWrapping="Wrap" />
+                                                    <TextBlock Text="{Binding Server.Address}" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                            </ToolTip.Tip>
+                                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{arc:ArcDesignTokenResource Space2}">
+                                                <arc:ArcGlyph Data="{StaticResource ServerGlyph}" Size="18" VerticalAlignment="Center" />
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                                                    <TextBlock Text="{Binding Server.Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Classes="account-secondary" Text="{Binding Host}" TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+
+                <Grid Grid.Column="1" RowDefinitions="Auto,*" RowSpacing="{arc:ArcDesignTokenResource Space3}">
+                    <TextBlock Classes="account-heading" Text="玩家档案" />
+                    <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Spacing="{arc:ArcDesignTokenResource Space3}">
+                            <Border x:Name="AddedServerCard" IsVisible="False" Classes="account-row"
+                                    Background="{arc:ArcDesignTokenResource AccentSubtle}">
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{arc:ArcDesignTokenResource Space3}">
+                                    <StackPanel VerticalAlignment="Center" Spacing="2">
+                                        <TextBlock x:Name="AddedServerName" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                                                   ToolTip.Tip="{Binding #AddedServerName.Text}" />
+                                        <TextBlock x:Name="AddedServerAddress" Classes="account-secondary" TextTrimming="CharacterEllipsis"
+                                                   ToolTip.Tip="{Binding #AddedServerAddress.Text}" />
+                                    </StackPanel>
+                                    <arc:Button Grid.Column="1" Content="登录" Variant="Secondary" Size="Small"
+                                                VerticalAlignment="Center" Click="OnAddedServerClicked" />
+                                </Grid>
+                            </Border>
+                            <TextBlock x:Name="AccountStatus" Classes="account-secondary" Text="正在加载…" TextWrapping="Wrap" />
+                            <arc:EmptyState x:Name="EmptyProfiles" Title="暂无玩家档案" IsVisible="False" />
+                            <ItemsControl ItemsSource="{Binding Profiles}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><StackPanel Spacing="{arc:ArcDesignTokenResource Space2}" /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="local:AccountProfileRow">
+                                        <Border Classes="account-row">
+                                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{arc:ArcDesignTokenResource Space3}">
+                                                <arc:Avatar DisplayName="{Binding Name}" Source="{Binding Avatar}"
+                                                            Size="Large" VerticalAlignment="Center" />
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                                                               ToolTip.Tip="{Binding Name}" />
+                                                    <TextBlock Classes="account-secondary" Text="{Binding Details}" TextTrimming="CharacterEllipsis"
+                                                               ToolTip.Tip="{Binding Details}" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Grid>
+
+            <arc:Button Grid.Row="2" Margin="20,12,20,16" HorizontalAlignment="Right"
+                        Size="Medium" Click="OnAddServerClicked" AutomationProperties.Name="添加认证服务器">
+                <StackPanel Orientation="Horizontal" Spacing="{arc:ArcDesignTokenResource Space2}">
+                    <arc:ArcGlyph Data="{StaticResource AddServerGlyph}" Size="16" VerticalAlignment="Center" />
+                    <TextBlock Text="添加认证服务器" VerticalAlignment="Center" />
+                </StackPanel>
+            </arc:Button>
+
+            <arc:Dialog x:Name="AccountForm" Grid.RowSpan="3" Size="Large" CloseOnOutsidePress="False"
+                        CloseButtonName="关闭" Opened="OnFormOpened" Closed="OnFormClosed">
+                <StackPanel Spacing="{arc:ArcDesignTokenResource Space3}">
+                    <arc:Input x:Name="ServerAddress" Label="服务器地址" Placeholder="https://example.com/api/yggdrasil" />
+                    <Grid x:Name="ServerPreview" IsVisible="False" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto"
+                          ColumnSpacing="{arc:ArcDesignTokenResource Space4}" RowSpacing="{arc:ArcDesignTokenResource Space3}">
+                        <TextBlock Text="服务器名称" Classes="account-secondary" />
+                        <TextBlock x:Name="PreviewName" Grid.Column="1" TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="1" Text="API 地址" Classes="account-secondary" />
+                        <TextBlock x:Name="PreviewAddress" Grid.Row="1" Grid.Column="1" TextWrapping="Wrap" />
+                    </Grid>
+                    <StackPanel x:Name="LoginFields" IsVisible="False" Spacing="{arc:ArcDesignTokenResource Space3}">
+                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="{arc:ArcDesignTokenResource Space2}">
+                            <TextBlock x:Name="LoginServerName" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" />
+                            <arc:Button x:Name="HomepageLink" Grid.Column="1" Content="主页" IsVisible="False"
+                                        Variant="Ghost" Size="Small" Click="OnHomepageClicked" />
+                            <arc:Button x:Name="RegistrationLink" Grid.Column="2" Content="注册" IsVisible="False"
+                                        Variant="Ghost" Size="Small" Click="OnRegistrationClicked" />
+                        </Grid>
+                        <arc:Input x:Name="LoginAccount" Label="用户名或邮箱" />
+                        <arc:PasswordField x:Name="LoginPassword" Label="密码"
+                                           IsUndoEnabled="False" ShowPasswordText="显示密码" HidePasswordText="隐藏密码" />
+                    </StackPanel>
+                    <arc:Input x:Name="OfflineName" IsVisible="False" Label="玩家名" />
+                    <ListBox x:Name="RoleList" IsVisible="False" MaxHeight="180" AutomationProperties.Name="选择游戏角色" />
+                    <TextBlock x:Name="FormError" IsVisible="False" TextWrapping="Wrap"
+                               Foreground="{arc:ArcDesignTokenResource Danger}" />
+                </StackPanel>
+                <arc:Dialog.Actions>
+                    <StackPanel Orientation="Horizontal" Spacing="{arc:ArcDesignTokenResource Space2}">
+                        <arc:Button x:Name="BackButton" Content="上一步" Variant="Ghost" Click="OnBackClicked" />
+                        <arc:Button Content="取消" Variant="Secondary" Click="OnCancelFormClicked" />
+                        <arc:Button x:Name="ConfirmButton" IsDefault="True" Click="OnConfirmClicked" />
+                    </StackPanel>
+                </arc:Dialog.Actions>
+            </arc:Dialog>
+        </Grid>
+    </Border>
+</Window>

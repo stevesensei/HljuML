@@ -32,4 +32,10 @@
       <ProjectReference Include="..\HljuML.Core\HljuML.Core.csproj" />
       <ProjectReference Include="..\HljuML.Shared\HljuML.Shared.csproj" />
     </ItemGroup>
+
+    <ItemGroup>
+      <Compile Update="Views\AccountWindow.axaml.cs">
+        <DependentUpon>AccountWindow.axaml</DependentUpon>
+      </Compile>
+    </ItemGroup>
 </Project>
