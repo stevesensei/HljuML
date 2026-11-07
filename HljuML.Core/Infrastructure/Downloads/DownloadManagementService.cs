@@ -9,7 +9,6 @@ namespace HljuML.Core.Infrastructure.Downloads;
 public sealed partial class DownloadManagementService(ILogger<DownloadManagementService> logger) : BackgroundService
 {
     private const int WorkerCount = 4;
-    private const int RecentResultLimit = 100;
     private static readonly TimeSpan TransferIdleTimeout = TimeSpan.FromSeconds(60);
     private static readonly StringComparer PathComparer = OperatingSystem.IsWindows()
         ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
@@ -21,7 +20,6 @@ public sealed partial class DownloadManagementService(ILogger<DownloadManagement
 
     private readonly object _sync = new();
     private readonly Dictionary<Guid, DownloadJob> _jobs = [];
-    private readonly Queue<Guid> _recentResults = new();
     private readonly HashSet<string> _reservedPaths = new(PathComparer);
     private readonly Channel<QueuedDownload> _queue = Channel.CreateUnbounded<QueuedDownload>();
 
@@ -65,6 +63,7 @@ public sealed partial class DownloadManagementService(ILogger<DownloadManagement
             _reservedPaths.UnionWith(paths);
         }
 
+        NotifyTaskCreated(job.Id);
         return job.Id;
     }
 
@@ -217,11 +216,16 @@ public sealed partial class DownloadManagementService(ILogger<DownloadManagement
 
     private void FinishJob(DownloadJob job, DownloadStatus status, string? error = null)
     {
+        if (!job.IsActive)
+            return;
         job.Status = status;
         job.Error = error;
-        _recentResults.Enqueue(job.Id);
-        if (_recentResults.Count > RecentResultLimit)
-            _jobs.Remove(_recentResults.Dequeue());
+        if (status == DownloadStatus.Succeeded)
+        {
+            job.Summary = job.Snapshot() with { Items = Array.Empty<DownloadItemSnapshot>() };
+            job.Items.Clear();
+        }
+        job.Batches.Clear();
     }
 
     private sealed record QueuedDownload(DownloadJob Job, IReadOnlyList<QueuedFile> Files);
@@ -234,17 +238,24 @@ public sealed partial class DownloadManagementService(ILogger<DownloadManagement
         internal bool IsActive => Status is DownloadStatus.Queued or DownloadStatus.Running;
         internal int? TotalFiles { get; set; }
         internal string? Error { get; set; }
+        internal string? Phase { get; set; }
+        internal bool IsOperation { get; init; }
+        internal List<ColorMcBatch> Batches { get; } = [];
+        internal DownloadSnapshot? Summary { get; set; }
         internal Dictionary<Guid, DownloadItemSnapshot> Items { get; } = [];
 
         internal DownloadSnapshot Snapshot()
         {
+            if (Summary is not null)
+                return Summary;
             var items = Items.Values.ToArray();
             var totalBytes = items.Length == TotalFiles && items.All(item => item.TotalBytes.HasValue)
                 ? items.Sum(item => item.TotalBytes) : null;
             return new DownloadSnapshot(Id, name, instanceId, Status, TotalFiles,
                 items.Count(item => item.Status == DownloadItemStatus.Succeeded),
                 items.Count(item => item.Status == DownloadItemStatus.Failed),
-                items.Sum(item => item.DownloadedBytes), totalBytes, Array.AsReadOnly(items), Error);
+                items.Sum(item => item.DownloadedBytes), totalBytes, Array.AsReadOnly(items), Error)
+                { Phase = Phase };
         }
     }
 }

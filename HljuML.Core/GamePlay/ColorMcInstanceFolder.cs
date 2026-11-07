@@ -39,6 +39,9 @@ internal static class ColorMcInstanceFolder
         }))
         {
             token.ThrowIfCancellationRequested();
+            if (File.Exists(Path.Combine(directory, GameInstallationService.PendingMarker))
+                || Path.GetFileName(directory).StartsWith(".hljuml-install-", StringComparison.Ordinal))
+                continue;
             var file = Path.Combine(directory, Names.NameGameFile);
             if (!File.Exists(file))
                 continue;

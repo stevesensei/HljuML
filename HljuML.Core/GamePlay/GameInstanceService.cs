@@ -20,10 +20,10 @@ using Microsoft.Extensions.Logging;
 namespace HljuML.Core.GamePlay;
 
 public sealed class GameInstanceService(IServiceScopeFactory scopeFactory, JavaEnvService javaEnvironments,
-    DownloadManagementService downloads, ILogger<GameInstanceService> logger) : IHostedService
+    DownloadManagementService downloads, ColorMcOperationCoordinator coordinator,
+    ILogger<GameInstanceService> logger) : IHostedService
 {
     private readonly ConcurrentDictionary<Guid, RunningProcess> _running = new();
-    private readonly SemaphoreSlim _launchGate = new(1, 1);
 
     public event Action? RunningInstancesChanged;
 
@@ -34,9 +34,12 @@ public sealed class GameInstanceService(IServiceScopeFactory scopeFactory, JavaE
     {
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<HljuMLDbContext>();
-        return await db.GameInstances.AsNoTracking().Include(instance => instance.GameFolder)
+        var instances = await db.GameInstances.AsNoTracking().Include(instance => instance.GameFolder)
             .OrderByDescending(instance => instance.LastLogin)
             .ThenBy(instance => instance.Name).ThenBy(instance => instance.Id).ToListAsync(cancellationToken);
+        return instances.Where(instance => !File.Exists(Path.Combine(
+            instance.GameFolder?.AbsolutePath ?? LauncherPaths.DefaultInstanceDirectory,
+            $"hljuml-{instance.Id:N}", GameInstallationService.PendingMarker))).ToArray();
     }
 
     public async Task<IReadOnlyList<GameFolder>> GetGameFolders(CancellationToken cancellationToken = default)
@@ -55,6 +58,7 @@ public sealed class GameInstanceService(IServiceScopeFactory scopeFactory, JavaE
         path = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
         try
         {
+            using var operation = await coordinator.EnterAsync(token);
             var games = await Task.Run(() => ColorMcInstanceFolder.ReadInstances(path, token).ToArray(), token);
             await using var scope = scopeFactory.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<HljuMLDbContext>();
@@ -95,11 +99,9 @@ public sealed class GameInstanceService(IServiceScopeFactory scopeFactory, JavaE
     public async Task<ServiceResult<int?>> LaunchGameInstance(Guid profileId, Guid instanceId,
         CancellationToken stoppingToken = default, IProgress<GameLaunchProgress>? progress = null)
     {
-        if (!_launchGate.Wait(0))
-            return ServiceResult<int?>.FailureResult(message: "正在启动实例，请稍候。");
-
         try
         {
+            using var operation = await coordinator.EnterAsync(stoppingToken);
             if (_running.ContainsKey(instanceId))
                 return ServiceResult<int?>.FailureResult(message: "该实例已经在运行。");
 
@@ -223,15 +225,14 @@ public sealed class GameInstanceService(IServiceScopeFactory scopeFactory, JavaE
             logger.LogError(e, "Failed to launch instance {InstanceId}", instanceId);
             return ServiceResult<int?>.InternalErrorResult(message: "启动实例时发生错误。");
         }
-        finally
-        {
-            _launchGate.Release();
-        }
     }
 
     private static async Task<ServiceResult<GameSettingObj>> ResolveGame(GameInstanceData instance,
         IProgress<GameLaunchProgress>? progress, CancellationToken cancellationToken)
     {
+        if (File.Exists(Path.Combine(instance.GameFolder?.AbsolutePath ?? LauncherPaths.DefaultInstanceDirectory,
+            $"hljuml-{instance.Id:N}", GameInstallationService.PendingMarker)))
+            return ServiceResult<GameSettingObj>.FailureResult(message: "实例尚未完成安装登记，请检查下载管理器。");
         if (instance.GameFolder is { } folder && !LauncherPaths.IsDefaultInstanceDirectory(folder.AbsolutePath))
             return await ColorMcInstanceFolder.ResolveAsync(instance, folder.AbsolutePath, progress, cancellationToken);
 
@@ -241,6 +242,12 @@ public sealed class GameInstanceService(IServiceScopeFactory scopeFactory, JavaE
                 ? ServiceResult<GameSettingObj>.SuccessResult(existing)
                 : ServiceResult<GameSettingObj>.FailureResult(message: "实例记录与 ColorMC 的版本或加载器配置不一致。");
         }
+
+        if (Directory.Exists(LauncherPaths.DefaultInstanceDirectory)
+            && ColorMcInstanceFolder.ReadInstances(LauncherPaths.DefaultInstanceDirectory, cancellationToken)
+                .Any(game => game.UUID == instance.Id))
+            return await ColorMcInstanceFolder.ResolveAsync(instance, LauncherPaths.DefaultInstanceDirectory,
+                progress, cancellationToken);
 
         if (instance.Loader != Loaders.Normal)
             return ServiceResult<GameSettingObj>.FailureResult(message: "请为此加载器准备同 ID 的 ColorMC 实例配置。");

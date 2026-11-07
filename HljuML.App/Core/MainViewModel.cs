@@ -20,6 +20,7 @@ namespace HljuML.App.Core;
 public class MainViewModel : INotifyPropertyChanged, IDisposable
 {
     private readonly GameInstanceService _gameInstances;
+    private readonly GameInstallationService _installations;
     private readonly IHostApplicationLifetime _appLifetime;
     private readonly IServiceScopeFactory _scopeFactory;
     private IReadOnlyList<ProfileOption> _profiles = [];
@@ -31,25 +32,34 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
     private Guid? _preferredProfileId;
     private bool _isLoading;
     private bool _isLaunching;
+    private bool _installedRefreshPending;
     private int _launchAttempt;
     private string? _optionsError;
     private GameLaunchProgress? _progress;
 
     public MainViewModel(GameInstanceService gameInstances, IHostApplicationLifetime appLifetime,
-        IServiceScopeFactory scopeFactory, DownloadManagementService downloads, JavaEnvService java)
+        IServiceScopeFactory scopeFactory, DownloadManagementService downloads, JavaEnvService java,
+        GameCatalogService catalog, GameInstallationService installations)
     {
         _gameInstances = gameInstances;
         _appLifetime = appLifetime;
         _scopeFactory = scopeFactory;
+        _installations = installations;
         Downloads = new DownloadQueueViewModel(downloads);
+        GameDownloads = new GameDownloadViewModel(catalog, installations, appLifetime.ApplicationStopping);
+        DownloadHub = new DownloadHubViewModel(GameDownloads,
+            new CommunityResourceViewModel(gameInstances, appLifetime.ApplicationStopping));
         JavaSettings = new JavaSettingsViewModel(java, appLifetime.ApplicationStopping);
         RunningInstances = _gameInstances.GetRunningInstances();
         _gameInstances.RunningInstancesChanged += OnRunningInstancesChanged;
+        _installations.Installed += OnInstalled;
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public DownloadQueueViewModel Downloads { get; }
+    public GameDownloadViewModel GameDownloads { get; }
+    public DownloadHubViewModel DownloadHub { get; }
     public JavaSettingsViewModel JavaSettings { get; }
 
     public string PlayerName => _selectedProfile?.Name ?? "选择玩家";
@@ -100,6 +110,7 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
             return;
 
         _isLoading = true;
+        _installedRefreshPending = false;
         NotifyLaunchState();
         try
         {
@@ -123,6 +134,8 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
         {
             _isLoading = false;
             NotifyLaunchState();
+            if (_installedRefreshPending && !_disposed)
+                _ = RefreshLaunchOptionsAsync();
         }
     }
 
@@ -223,6 +236,8 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
             _isLaunching = false;
             _progress = null;
             RefreshRunningInstances();
+            if (_installedRefreshPending && !_disposed)
+                _ = RefreshLaunchOptionsAsync();
         }
     }
 
@@ -242,6 +257,14 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
     }
 
     private void OnRunningInstancesChanged() => Dispatcher.UIThread.Post(RefreshRunningInstances);
+
+    private void OnInstalled() => Dispatcher.UIThread.Post(async () =>
+    {
+        if (_disposed)
+            return;
+        _installedRefreshPending = true;
+        await RefreshLaunchOptionsAsync();
+    });
 
     private void RefreshRunningInstances()
     {
@@ -279,7 +302,10 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
     {
         _disposed = true;
         JavaSettings.Dispose();
+        DownloadHub.Dispose();
+        GameDownloads.Dispose();
         _gameInstances.RunningInstancesChanged -= OnRunningInstancesChanged;
+        _installations.Installed -= OnInstalled;
         foreach (var avatar in _playerAvatars.Values)
             avatar.Dispose();
         _playerAvatars.Clear();

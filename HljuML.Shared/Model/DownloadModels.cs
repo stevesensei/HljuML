@@ -33,6 +33,8 @@ public sealed record DownloadSnapshot(Guid Id, string Name, Guid? InstanceId, Do
     int? TotalFiles, int SucceededFiles, int FailedFiles, long DownloadedBytes, long? TotalBytes,
     IReadOnlyList<DownloadItemSnapshot> Items, string? Error)
 {
+    public string? Phase { get; init; }
+
     public double? Percent => TotalBytes switch
     {
         > 0 => Math.Min(100, DownloadedBytes * 100.0 / TotalBytes.Value),

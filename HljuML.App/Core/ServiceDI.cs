@@ -22,13 +22,18 @@ public static class ServiceCollectionExtensions
         collection.AddHostedService<SqliteDatabaseInitializer>();
 
         collection.AddSingleton<JavaEnvService>();
+        collection.AddSingleton<ColorMcOperationCoordinator>();
+        collection.AddSingleton<GameCatalogService>();
+        collection.AddSingleton<GameInstallationService>();
         collection.AddSingleton<GameInstanceService>();
         collection.AddHostedService(services => services.GetRequiredService<GameInstanceService>());
+        collection.AddHostedService(services => services.GetRequiredService<GameInstallationService>());
         collection.AddHostedService(services => services.GetRequiredService<JavaEnvService>());
         collection.AddSingleton<DownloadManagementService>();
         collection.AddHostedService(services => services.GetRequiredService<DownloadManagementService>());
         collection.AddSingleton<MainViewModel>();
-        collection.AddSingleton(services => new MainWindow(services.GetRequiredService<IServiceScopeFactory>())
+        collection.AddSingleton(services => new MainWindow(services.GetRequiredService<IServiceScopeFactory>(),
+            services.GetRequiredService<DownloadManagementService>())
         {
             DataContext = services.GetRequiredService<MainViewModel>()
         });

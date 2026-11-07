@@ -1,0 +1,117 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:arc="https://github.com/AIDotNet/TKCode.Arc"
+             xmlns:vm="using:HljuML.App.Core"
+             x:Class="HljuML.App.Views.CommunityResourceView"
+             x:DataType="vm:CommunityResourceViewModel"
+             AttachedToVisualTree="OnAttached">
+    <UserControl.Resources>
+        <vm:UniformThicknessConverter x:Key="UniformThicknessConverter" />
+    </UserControl.Resources>
+    <UserControl.Styles>
+        <Style Selector="TextBlock">
+            <Setter Property="Foreground" Value="{arc:ArcDesignTokenResource Foreground}" />
+            <Setter Property="FontSize" Value="{arc:ArcDesignTokenResource TypeBase}" />
+        </Style>
+        <Style Selector="TextBlock.description">
+            <Setter Property="Foreground" Value="{arc:ArcDesignTokenResource TextSecondary}" />
+            <Setter Property="FontSize" Value="{arc:ArcDesignTokenResource TypeSM}" />
+        </Style>
+        <Style Selector="Border.section">
+            <Setter Property="Background" Value="{arc:ArcDesignTokenResource Surface}" />
+            <Setter Property="BorderBrush" Value="{arc:ArcDesignTokenResource Border}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="{arc:ArcDesignTokenResource RadiusPanel}" />
+            <Setter Property="Tag" Value="{arc:ArcDesignTokenResource Space4}" />
+            <Setter Property="Padding" Value="{Binding $self.Tag, Converter={StaticResource UniformThicknessConverter}}" />
+        </Style>
+    </UserControl.Styles>
+    <Grid RowDefinitions="Auto,Auto,*" RowSpacing="{arc:ArcDesignTokenResource Space4}">
+        <StackPanel Spacing="{arc:ArcDesignTokenResource Space1}">
+            <TextBlock Text="{Binding Title}" FontSize="{arc:ArcDesignTokenResource Type3XL}" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding Description}" Classes="description" TextWrapping="Wrap" />
+        </StackPanel>
+
+        <Border Grid.Row="1" Classes="section">
+            <StackPanel Spacing="{arc:ArcDesignTokenResource Space3}">
+                <arc:SearchField Label="搜索社区资源" Placeholder="输入名称或关键词"
+                                 ClearText="清除搜索" Size="Small"
+                                 Text="{Binding SearchText, Mode=TwoWay}" />
+                <WrapPanel ItemSpacing="{arc:ArcDesignTokenResource Space3}"
+                           LineSpacing="{arc:ArcDesignTokenResource Space3}">
+                    <arc:Select Label="游戏版本" MinWidth="{arc:ArcDesignTokenResource Space24}"
+                                ItemsSource="{Binding VersionOptions}"
+                                SelectedItem="{Binding SelectedVersion, Mode=TwoWay}" />
+                    <arc:Select Label="加载器" MinWidth="{arc:ArcDesignTokenResource Space24}"
+                                ItemsSource="{Binding LoaderOptions}"
+                                SelectedItem="{Binding SelectedLoader, Mode=TwoWay}" />
+                    <arc:Select Label="分类" MinWidth="{arc:ArcDesignTokenResource Space24}"
+                                ItemsSource="{Binding CategoryOptions}"
+                                SelectedItem="{Binding SelectedCategory, Mode=TwoWay}" />
+                    <arc:Select Label="排序" MinWidth="{arc:ArcDesignTokenResource Space24}"
+                                ItemsSource="{Binding SortOptions}"
+                                SelectedItem="{Binding SelectedSort, Mode=TwoWay}" />
+                </WrapPanel>
+                <arc:Skeleton IsVisible="{Binding IsLoadingTargets}" Lines="2" Label="正在读取兼容实例" />
+                <arc:Select Label="安装到实例" IsVisible="{Binding RequiresTargetInstance}"
+                            ItemsSource="{Binding TargetInstances}"
+                            SelectedItem="{Binding SelectedTarget, Mode=TwoWay}"
+                            Placeholder="选择兼容实例" />
+                <TextBlock Classes="description" IsVisible="{Binding HasTargetLoadError}"
+                           Text="{Binding TargetLoadError}" TextWrapping="Wrap" />
+                <StackPanel IsVisible="{Binding ShowsModpackDestination}" Spacing="{arc:ArcDesignTokenResource Space1}">
+                    <TextBlock Text="新实例目录" FontWeight="SemiBold" />
+                    <TextBlock Classes="description" Text="{Binding ModpackDestination}" TextWrapping="Wrap" />
+                </StackPanel>
+                <TextBlock Classes="description" IsVisible="{Binding ShowsWorldNotice}"
+                           Text="目标世界选择尚未接入；当前不会执行数据包安装。" TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Row="2">
+            <Grid IsVisible="{Binding IsBrowsingResults}">
+                <ListBox ItemsSource="{Binding Results}" SelectedItem="{Binding SelectedResource, Mode=TwoWay}"
+                         IsVisible="{Binding HasResults}" Background="Transparent" BorderThickness="0"
+                         AutomationProperties.Name="社区资源结果">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:CommunityResourceItem">
+                            <Border Classes="section">
+                                <StackPanel Spacing="{arc:ArcDesignTokenResource Space1}">
+                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                    <TextBlock Text="{Binding Summary}" Classes="description" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding Author}" Classes="description" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+                <arc:EmptyState IsVisible="{Binding !HasResults}" Label="社区资源结果"
+                                Title="社区资源即将开放"
+                                Description="资源提供方尚未接入。你可以先创建原版游戏实例，稍后再安装社区内容。">
+                    <arc:EmptyState.Action>
+                        <arc:Button Content="创建原版实例" Variant="Primary" Click="OnCreateVanillaClicked" />
+                    </arc:EmptyState.Action>
+                </arc:EmptyState>
+            </Grid>
+            <Border Classes="section" IsVisible="{Binding HasSelectedResource}">
+                <Grid RowDefinitions="Auto,*,Auto" RowSpacing="{arc:ArcDesignTokenResource Space4}">
+                    <arc:Button Content="返回资源列表" Variant="Ghost" HorizontalAlignment="Left"
+                                Click="OnBackToResultsClicked" />
+                    <StackPanel Grid.Row="1" Spacing="{arc:ArcDesignTokenResource Space2}">
+                        <TextBlock Text="{Binding SelectedResource.Name}" FontSize="{arc:ArcDesignTokenResource Type2XL}"
+                                   FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding SelectedResource.Summary}" Classes="description" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding SelectedResource.Author, StringFormat='作者：{0}'}" Classes="description" />
+                        <TextBlock Text="{Binding SelectedResource.VersionLabel}" Classes="description" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right"
+                                Spacing="{arc:ArcDesignTokenResource Space2}">
+                        <TextBlock Text="资源版本与兼容目标可用后才能安装。" Classes="description"
+                                   VerticalAlignment="Center" />
+                        <arc:Button Content="安装资源" Variant="Primary" IsEnabled="{Binding CanInstall}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

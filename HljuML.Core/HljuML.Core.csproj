@@ -20,4 +20,16 @@
       <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="11.0.0-rc.3.26522.148" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Compile Update="GamePlay\GameInstallationService.Files.cs">
+        <DependentUpon>GameInstallationService.cs</DependentUpon>
+      </Compile>
+      <Compile Update="GamePlay\GameInstallationService.Publication.cs">
+        <DependentUpon>GameInstallationService.cs</DependentUpon>
+      </Compile>
+      <Compile Update="GamePlay\GameInstallationService.Validation.cs">
+        <DependentUpon>GameInstallationService.cs</DependentUpon>
+      </Compile>
+    </ItemGroup>
+
 </Project>

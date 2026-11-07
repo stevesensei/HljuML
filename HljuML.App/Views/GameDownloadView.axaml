@@ -1,0 +1,241 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:arc="https://github.com/AIDotNet/TKCode.Arc"
+             xmlns:vm="using:HljuML.App.Core"
+             x:Class="HljuML.App.Views.GameDownloadView"
+             x:Name="DownloadRoot"
+             x:DataType="vm:GameDownloadViewModel">
+    <UserControl.Resources>
+        <vm:UniformThicknessConverter x:Key="UniformThicknessConverter" />
+        <DataTemplate x:Key="VersionRowTemplate" x:DataType="vm:GameCatalogRow">
+            <Border BorderBrush="{arc:ArcDesignTokenResource BorderSubtle}" BorderThickness="0,0,0,1">
+                <arc:Button Variant="Ghost" Size="Small" Click="OnVersionClicked"
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                            Tag="{arc:ArcDesignTokenResource Space3}"
+                            Padding="{Binding $self.Tag, Converter={StaticResource UniformThicknessConverter}}">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="{arc:ArcDesignTokenResource Space3}">
+                        <Image Source="avares://HljuML.App/Assets/loaders/minecraft.png"
+                               Width="{arc:ArcDesignTokenResource Space8}" Height="{arc:ArcDesignTokenResource Space8}"
+                               Stretch="Uniform" RenderOptions.BitmapInterpolationMode="None" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="{arc:ArcDesignTokenResource Space1}">
+                            <TextBlock Text="{Binding Title}" FontWeight="Medium" />
+                            <TextBlock Text="{Binding Detail}" Classes="description" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="2" Text="›" VerticalAlignment="Center"
+                                   Foreground="{arc:ArcDesignTokenResource TextSecondary}" />
+                    </Grid>
+                </arc:Button>
+            </Border>
+        </DataTemplate>
+    </UserControl.Resources>
+    <UserControl.Styles>
+        <Style Selector="TextBlock">
+            <Setter Property="Foreground" Value="{arc:ArcDesignTokenResource Foreground}" />
+            <Setter Property="FontSize" Value="{arc:ArcDesignTokenResource TypeBase}" />
+        </Style>
+        <Style Selector="TextBlock.description">
+            <Setter Property="Foreground" Value="{arc:ArcDesignTokenResource TextSecondary}" />
+            <Setter Property="FontSize" Value="{arc:ArcDesignTokenResource TypeSM}" />
+        </Style>
+        <Style Selector="TextBlock.caption">
+            <Setter Property="Foreground" Value="{arc:ArcDesignTokenResource TextMuted}" />
+            <Setter Property="FontSize" Value="{arc:ArcDesignTokenResource TypeXS}" />
+        </Style>
+        <Style Selector="ListBoxItem">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Focusable" Value="False" />
+        </Style>
+    </UserControl.Styles>
+
+    <Border MaxWidth="920" HorizontalAlignment="Center" VerticalAlignment="Stretch"
+            Background="{arc:ArcDesignTokenResource Surface}"
+            BorderBrush="{arc:ArcDesignTokenResource Border}" BorderThickness="1"
+            CornerRadius="{arc:ArcDesignTokenResource RadiusSurface}"
+            Tag="{arc:ArcDesignTokenResource Space5}"
+            Padding="{Binding $self.Tag, Converter={StaticResource UniformThicknessConverter}}">
+        <Grid>
+            <Grid IsVisible="{Binding IsBrowsing}" RowDefinitions="Auto,Auto,Auto,*"
+                  RowSpacing="{arc:ArcDesignTokenResource Space4}">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{arc:ArcDesignTokenResource Space3}">
+                    <StackPanel Spacing="{arc:ArcDesignTokenResource Space1}">
+                        <TextBlock Text="下载游戏" FontSize="{arc:ArcDesignTokenResource Type2XL}" FontWeight="SemiBold" />
+                        <TextBlock Text="选择 Minecraft 版本并创建实例。" Classes="description" />
+                    </StackPanel>
+                    <arc:Button Grid.Column="1" Content="刷新版本" Variant="Secondary" Size="Small"
+                                VerticalAlignment="Center" IsLoading="{Binding IsCatalogLoading}"
+                                Click="OnRefreshClicked" />
+                </Grid>
+
+                <StackPanel Grid.Row="1" Spacing="{arc:ArcDesignTokenResource Space3}">
+                    <arc:Alert Title="无法更新版本目录" Content="{Binding CatalogError}" Tone="Danger"
+                               IsVisible="{Binding HasCatalogError}" />
+                    <Grid x:Name="LatestGrid" ColumnDefinitions="*,*" ColumnSpacing="{arc:ArcDesignTokenResource Space3}"
+                          RowSpacing="{arc:ArcDesignTokenResource Space2}" IsVisible="{Binding HasVersions}">
+                        <Border x:Name="LatestReleaseCard" Background="{arc:ArcDesignTokenResource SurfaceMuted}"
+                                CornerRadius="{arc:ArcDesignTokenResource RadiusPanel}">
+                            <StackPanel>
+                                <TextBlock Text="最新正式版" Classes="caption" Tag="{arc:ArcDesignTokenResource Space3}"
+                                           Margin="{Binding $self.Tag, Converter={StaticResource UniformThicknessConverter}}" />
+                                <ContentControl Content="{Binding LatestRelease}" IsVisible="{Binding HasLatestRelease}"
+                                                ContentTemplate="{StaticResource VersionRowTemplate}" />
+                            </StackPanel>
+                        </Border>
+                        <Border x:Name="LatestSnapshotCard" Grid.Column="1"
+                                Background="{arc:ArcDesignTokenResource SurfaceMuted}"
+                                CornerRadius="{arc:ArcDesignTokenResource RadiusPanel}">
+                            <StackPanel>
+                                <TextBlock Text="最新快照版" Classes="caption" Tag="{arc:ArcDesignTokenResource Space3}"
+                                           Margin="{Binding $self.Tag, Converter={StaticResource UniformThicknessConverter}}" />
+                                <ContentControl Content="{Binding LatestSnapshot}" IsVisible="{Binding HasLatestSnapshot}"
+                                                ContentTemplate="{StaticResource VersionRowTemplate}" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </StackPanel>
+
+                <Grid x:Name="CatalogToolbar" Grid.Row="2" ColumnDefinitions="*,Auto"
+                      ColumnSpacing="{arc:ArcDesignTokenResource Space3}" RowSpacing="{arc:ArcDesignTokenResource Space2}"
+                      IsVisible="{Binding HasVersions}">
+                    <arc:SearchField Label="筛选游戏版本" IsLabelVisible="False" Placeholder="输入版本 Id"
+                                     ClearText="清除版本筛选" Size="Small"
+                                     Text="{Binding SearchText, Mode=TwoWay}" />
+                    <arc:SegmentedControl x:Name="CatalogSegments" Grid.Column="1"
+                                          AutomationProperties.Name="版本类型"
+                                          SelectedValue="{Binding CatalogFilter, Mode=TwoWay}">
+                        <arc:SegmentedOption Value="release" Label="正式版" />
+                        <arc:SegmentedOption Value="snapshot" Label="快照版" />
+                        <arc:SegmentedOption Value="old" Label="远古版" />
+                    </arc:SegmentedControl>
+                </Grid>
+
+                <Grid Grid.Row="3">
+                    <ListBox ItemsSource="{Binding CatalogRows}" IsVisible="{Binding HasCatalogRows}"
+                             Background="Transparent" BorderThickness="0" SelectionMode="Single"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             AutomationProperties.Name="Minecraft 版本目录">
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:GameCatalogRow">
+                                <ContentControl Content="{Binding}" ContentTemplate="{StaticResource VersionRowTemplate}" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <StackPanel Spacing="{arc:ArcDesignTokenResource Space3}" IsVisible="{Binding IsCatalogLoading}">
+                        <arc:Skeleton Lines="2" IsAvatarVisible="True" Label="正在获取游戏版本" />
+                        <arc:Skeleton Lines="2" IsAvatarVisible="True" Label="正在获取游戏版本" />
+                    </StackPanel>
+                    <arc:EmptyState Title="暂无游戏版本" Description="版本目录为空，请刷新后重试。"
+                                    Label="游戏版本目录" IsVisible="{Binding IsCatalogEmpty}" />
+                    <arc:EmptyState Title="没有匹配的版本" Description="请更换版本类型或清除筛选。"
+                                    Icon="{x:Static arc:ArcIcons.Search}" Label="版本筛选结果"
+                                    IsVisible="{Binding IsCatalogFilteredEmpty}" />
+                </Grid>
+            </Grid>
+
+            <Grid IsVisible="{Binding IsConfiguring}" RowDefinitions="Auto,*,Auto"
+                  RowSpacing="{arc:ArcDesignTokenResource Space4}">
+                <Grid x:Name="ConfigurationHeader" ColumnDefinitions="Auto,Auto,*"
+                      ColumnSpacing="{arc:ArcDesignTokenResource Space3}" RowSpacing="{arc:ArcDesignTokenResource Space2}">
+                    <arc:Button Content="← 返回版本" Variant="Ghost" Size="Small" Click="OnBackClicked"
+                                VerticalAlignment="Center" IsEnabled="{Binding !IsSubmitting}" />
+                    <Image x:Name="ConfigurationIcon" Grid.Column="1" Source="{Binding InstanceIcon}"
+                           Width="{arc:ArcDesignTokenResource Space10}" Height="{arc:ArcDesignTokenResource Space10}"
+                           Stretch="Uniform" RenderOptions.BitmapInterpolationMode="None" />
+                    <StackPanel x:Name="ConfigurationTitle" Grid.Column="2" VerticalAlignment="Center">
+                        <TextBlock Text="配置下载" FontSize="{arc:ArcDesignTokenResource TypeLG}" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding SelectedVersionLabel}" Classes="description" />
+                    </StackPanel>
+                </Grid>
+
+                <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="{arc:ArcDesignTokenResource Space4}">
+                        <arc:Input Label="实例名称" Size="Small" Text="{Binding InstanceName, Mode=TwoWay}"
+                                   ErrorMessage="{Binding NameError}" MaxLength="128"
+                                   IsEnabled="{Binding CanEditConfiguration}" />
+
+                        <StackPanel Spacing="{arc:ArcDesignTokenResource Space2}"
+                                    IsEnabled="{Binding CanEditConfiguration}">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel Spacing="{arc:ArcDesignTokenResource Space1}">
+                                    <TextBlock Text="加载器" FontWeight="SemiBold" />
+                                    <TextBlock Text="选择一个加载器，或保留原版。" Classes="description" />
+                                </StackPanel>
+                                <arc:Button Grid.Column="1" Content="重试加载器" Variant="Secondary" Size="Small"
+                                            IsVisible="{Binding HasLoaderErrors}" IsLoading="{Binding AreLoadersLoading}"
+                                            Click="OnRetryLoadersClicked" />
+                            </Grid>
+                            <Border Background="{arc:ArcDesignTokenResource SurfaceMuted}"
+                                    CornerRadius="{arc:ArcDesignTokenResource RadiusPanel}">
+                                <ItemsControl ItemsSource="{Binding LoaderChoices}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:GameLoaderChoice">
+                                            <Border BorderBrush="{arc:ArcDesignTokenResource BorderSubtle}"
+                                                    BorderThickness="0,0,0,1">
+                                                <StackPanel>
+                                                    <arc:Button Variant="Ghost" Size="Small" Click="OnLoaderClicked"
+                                                                IsEnabled="{Binding !IsDisabled}"
+                                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                                                Tag="{arc:ArcDesignTokenResource Space3}"
+                                                                Padding="{Binding $self.Tag, Converter={StaticResource UniformThicknessConverter}}">
+                                                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="{arc:ArcDesignTokenResource Space3}">
+                                                            <Image Source="{Binding Icon}" Width="{arc:ArcDesignTokenResource Space6}"
+                                                                   Height="{arc:ArcDesignTokenResource Space6}"
+                                                                   RenderOptions.BitmapInterpolationMode="None" />
+                                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding Label}" FontWeight="Medium" />
+                                                                <TextBlock Text="{Binding Description}" Classes="description" TextWrapping="Wrap" />
+                                                            </StackPanel>
+                                                            <TextBlock Grid.Column="2" Text="选择" Classes="description"
+                                                                       IsVisible="{Binding !IsSelected}" VerticalAlignment="Center" />
+                                                            <TextBlock Grid.Column="2" Text="移除" Foreground="{arc:ArcDesignTokenResource Danger}"
+                                                                       IsVisible="{Binding IsSelected}" VerticalAlignment="Center" />
+                                                        </Grid>
+                                                    </arc:Button>
+                                                    <arc:Select Label="{Binding #DownloadRoot.DataContext.LoaderVersionLabel}"
+                                                                ItemsSource="{Binding #DownloadRoot.DataContext.LoaderVersions}"
+                                                                SelectedItem="{Binding #DownloadRoot.DataContext.SelectedLoaderVersion, Mode=TwoWay}"
+                                                                IsVisible="{Binding IsSelected}"
+                                                                Tag="{arc:ArcDesignTokenResource Space3}"
+                                                                Margin="{Binding $self.Tag, Converter={StaticResource UniformThicknessConverter}}" />
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Border>
+                        </StackPanel>
+
+                        <Expander Header="默认实例目录" HorizontalAlignment="Stretch">
+                            <TextBlock Text="{Binding TargetDirectory}" Classes="description"
+                                       TextWrapping="Wrap" Tag="{arc:ArcDesignTokenResource Space2}"
+                                       Margin="{Binding $self.Tag, Converter={StaticResource UniformThicknessConverter}}" />
+                        </Expander>
+                        <arc:Alert Title="无法创建安装任务" Content="{Binding InstallationError}" Tone="Danger"
+                                   IsVisible="{Binding HasInstallationError}" />
+                        <arc:Alert Title="已加入下载队列" Content="可在下载管理器中查看安装进度。" Tone="Success"
+                                   IsVisible="{Binding IsEnqueued}" />
+                    </StackPanel>
+                </ScrollViewer>
+
+                <Border Grid.Row="2" Background="{arc:ArcDesignTokenResource SurfaceMuted}"
+                        CornerRadius="{arc:ArcDesignTokenResource RadiusPanel}"
+                        Tag="{arc:ArcDesignTokenResource Space3}"
+                        Padding="{Binding $self.Tag, Converter={StaticResource UniformThicknessConverter}}">
+                    <Grid x:Name="InstallFooter" ColumnDefinitions="*,Auto"
+                          ColumnSpacing="{arc:ArcDesignTokenResource Space3}" RowSpacing="{arc:ArcDesignTokenResource Space2}">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="下载摘要" Classes="caption" />
+                            <TextBlock Text="{Binding InstallationSummary}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <arc:Button x:Name="InstallButton" Grid.Column="1" Content="开始下载" Variant="Primary" Size="Small"
+                                    IsEnabled="{Binding CanInstall}" IsLoading="{Binding IsSubmitting}"
+                                    Click="OnInstallClicked" />
+                    </Grid>
+                </Border>
+            </Grid>
+        </Grid>
+    </Border>
+</UserControl>

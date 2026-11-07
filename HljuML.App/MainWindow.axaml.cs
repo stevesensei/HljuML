@@ -9,6 +9,7 @@ using Avalonia.Threading;
 using HljuML.App.Core;
 using HljuML.App.Views;
 using HljuML.Core.Model.Entity;
+using HljuML.Core.Infrastructure.Downloads;
 using HljuML.Shared.Model;
 using Microsoft.Extensions.DependencyInjection;
 using TKCode.Arc;
@@ -19,6 +20,11 @@ namespace HljuML.App;
 public partial class MainWindow : Window
 {
     private readonly IServiceScopeFactory? _scopes;
+    private readonly DownloadManagementService? _downloads;
+    private readonly HashSet<Guid> _openedDownloadTasks = new();
+    private DownloadManagerWindow? _downloadManager;
+    private bool _closed;
+    private bool _openDownloadsWhenOpened;
     private readonly DispatcherTimer _downloadsTimer = new(DispatcherPriority.Background)
     {
         Interval = TimeSpan.FromMilliseconds(400)
@@ -28,10 +34,15 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         PropertyChanged += OnWindowPropertyChanged;
-        _downloadsTimer.Tick += (_, _) => RefreshDownloads();
+        _downloadsTimer.Tick += OnDownloadsTick;
     }
 
-    internal MainWindow(IServiceScopeFactory scopes) : this() => _scopes = scopes;
+    internal MainWindow(IServiceScopeFactory scopes, DownloadManagementService downloads) : this()
+    {
+        _scopes = scopes;
+        _downloads = downloads;
+        _downloads.TaskCreated += OnDownloadTaskCreated;
+    }
 
     public IList<Control> HomeCards => HomeFeed.Children;
 
@@ -42,6 +53,8 @@ public partial class MainWindow : Window
         {
             RefreshDownloads();
             _downloadsTimer.Start();
+            if (_openDownloadsWhenOpened)
+                ShowDownloadManager();
             await viewModel.RefreshLaunchOptionsAsync();
         }
     }
@@ -49,6 +62,12 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _downloadsTimer.Stop();
+        _downloadsTimer.Tick -= OnDownloadsTick;
+        _closed = true;
+        if (_downloads is not null)
+            _downloads.TaskCreated -= OnDownloadTaskCreated;
+        _downloadManager?.Close();
+        PropertyChanged -= OnWindowPropertyChanged;
         base.OnClosed(e);
     }
 
@@ -57,15 +76,54 @@ public partial class MainWindow : Window
     private void OnDownloadsClicked(object? sender, RoutedEventArgs e)
     {
         ShowPage(DownloadsPage, DownloadsButton);
-        RefreshDownloads();
-        if (sender != DownloadsButton)
-            DownloadsButton.Focus();
     }
+
+    private void OnDownloadsTick(object? sender, EventArgs e) => RefreshDownloads();
 
     private void RefreshDownloads()
     {
         if (DataContext is MainViewModel viewModel)
-            viewModel.Downloads.Refresh(DownloadsPage.IsVisible);
+            viewModel.Downloads.Refresh(includeDetails: false);
+    }
+
+    private void OnDownloadTaskCreated(Guid id) => Dispatcher.UIThread.Post(() =>
+    {
+        if (_closed || !_openedDownloadTasks.Add(id))
+            return;
+        RefreshDownloads();
+        if (IsVisible)
+            ShowDownloadManager();
+        else
+            _openDownloadsWhenOpened = true;
+    });
+
+    private void OnDownloadManagerClicked(object? sender, RoutedEventArgs e) => ShowDownloadManager();
+
+    private void ShowDownloadManager()
+    {
+        if (_closed || DataContext is not MainViewModel viewModel)
+            return;
+        if (_downloadManager is { } existing)
+        {
+            existing.RefreshDownloads();
+            if (existing.WindowState == WindowState.Minimized)
+                existing.WindowState = WindowState.Normal;
+            existing.Activate();
+            return;
+        }
+        var window = new DownloadManagerWindow { DataContext = viewModel.Downloads };
+        _downloadManager = window;
+        window.Closed += OnDownloadManagerClosed;
+        window.Show(this);
+    }
+
+    private void OnDownloadManagerClosed(object? sender, EventArgs e)
+    {
+        if (sender is DownloadManagerWindow window)
+            window.Closed -= OnDownloadManagerClosed;
+        if (ReferenceEquals(_downloadManager, sender))
+            _downloadManager = null;
+        RefreshDownloads();
     }
 
     private void OnLaunchDockSizeChanged(object? sender, SizeChangedEventArgs e)
@@ -86,6 +144,7 @@ public partial class MainWindow : Window
         HomePage.IsVisible = page == HomePage;
         DownloadsPage.IsVisible = page == DownloadsPage;
         SettingsPage.IsVisible = page == SettingsPage;
+        PageScroll.IsVisible = page != DownloadsPage;
         HomeButton.Variant = activeButton == HomeButton ? ButtonVariant.Secondary : ButtonVariant.Ghost;
         DownloadsButton.Variant = activeButton == DownloadsButton ? ButtonVariant.Secondary : ButtonVariant.Ghost;
         SettingsButton.Variant = activeButton == SettingsButton ? ButtonVariant.Secondary : ButtonVariant.Ghost;

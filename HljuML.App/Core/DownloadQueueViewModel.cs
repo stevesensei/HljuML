@@ -11,35 +11,28 @@ namespace HljuML.App.Core;
 public sealed class DownloadQueueViewModel(DownloadManagementService downloads) : INotifyPropertyChanged
 {
     private readonly Dictionary<Guid, DownloadTaskViewModel> _tasksById = new();
-    private int _count;
+    private int _activeCount;
+    private int _totalCount;
+    private bool _hasPendingOrFailedTasks;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public ObservableCollection<DownloadTaskViewModel> Tasks { get; } = new();
-    public bool HasActiveDownloads => _count > 0;
-    public string Summary => HasActiveDownloads ? $"当前有 {_count} 项下载任务" : "当前没有下载任务。";
+    public bool HasActiveDownloads => _activeCount > 0;
+    public bool HasTasks => _totalCount > 0;
+    public bool HasPendingOrFailedTasks => _hasPendingOrFailedTasks;
+    public string Summary => HasActiveDownloads ? $"当前有 {_activeCount} 项下载任务"
+        : HasPendingOrFailedTasks ? "有下载未完成，请查看任务结果。"
+        : HasTasks ? $"本次运行已完成 {_totalCount} 项下载。" : "当前没有下载任务。";
 
     internal void Refresh(bool includeDetails)
     {
+        var summary = downloads.GetQueueSummary();
+        SetCounts(summary.TotalCount, summary.ActiveCount, summary.HasPendingOrFailed);
         if (!includeDetails)
-        {
-            SetCount(downloads.GetActiveDownloadCount());
             return;
-        }
 
-        var active = downloads.GetActiveDownloads();
-        var activeIds = active.Select(task => task.Id).ToHashSet();
-        for (var index = Tasks.Count - 1; index >= 0; index--)
-        {
-            var task = Tasks[index];
-            if (activeIds.Contains(task.Id))
-                continue;
-
-            _tasksById.Remove(task.Id);
-            Tasks.RemoveAt(index);
-        }
-
-        foreach (var snapshot in active)
+        foreach (var snapshot in downloads.GetDownloads())
         {
             if (_tasksById.TryGetValue(snapshot.Id, out var task))
             {
@@ -51,17 +44,19 @@ public sealed class DownloadQueueViewModel(DownloadManagementService downloads) 
             _tasksById.Add(task.Id, task);
             Tasks.Add(task);
         }
-
-        SetCount(active.Count);
     }
 
-    private void SetCount(int count)
+    private void SetCounts(int total, int active, bool pendingOrFailed)
     {
-        if (_count == count)
+        if (_totalCount == total && _activeCount == active && _hasPendingOrFailedTasks == pendingOrFailed)
             return;
 
-        _count = count;
+        _totalCount = total;
+        _activeCount = active;
+        _hasPendingOrFailedTasks = pendingOrFailed;
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasActiveDownloads)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasTasks)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasPendingOrFailedTasks)));
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Summary)));
     }
 
@@ -95,6 +90,10 @@ public sealed class DownloadTaskViewModel : INotifyPropertyChanged
     public string Name { get; }
     public string Status => _progress.Status;
     public string Summary => _progress.Summary;
+    public string? Phase => _progress.Phase;
+    public bool HasPhase => !string.IsNullOrWhiteSpace(Phase);
+    public string? Error => _progress.Error;
+    public bool HasError => !string.IsNullOrWhiteSpace(Error);
     public string ProgressLabel => _progress.Label;
     public double ProgressValue => _progress.Percent ?? 0;
     public bool HasProgress => _progress.Percent.HasValue;
@@ -119,18 +118,28 @@ public sealed class DownloadTaskViewModel : INotifyPropertyChanged
 
     private static TaskProgress DescribeProgress(DownloadSnapshot snapshot)
     {
-        var status = snapshot.Status == DownloadStatus.Queued ? "排队中" : "进行中";
+        var status = snapshot.Status switch
+        {
+            DownloadStatus.Queued => "排队中",
+            DownloadStatus.Running => "进行中",
+            DownloadStatus.Succeeded => "已完成",
+            DownloadStatus.Failed => "失败",
+            DownloadStatus.Canceled => "已取消",
+            _ => throw new ArgumentOutOfRangeException(nameof(snapshot))
+        };
         var processed = snapshot.SucceededFiles + snapshot.FailedFiles;
         var files = snapshot.TotalFiles is { } total ? $"已处理 {processed}/{total} 个文件" : "正在确认文件数量";
         var transfer = DownloadQueueViewModel.FormatTransfer(snapshot.DownloadedBytes, snapshot.TotalBytes);
         var filePercent = snapshot.TotalFiles is > 0 ? Math.Min(100, processed * 100.0 / snapshot.TotalFiles.Value) : (double?)null;
-        return new(status, $"{files} · {transfer}", snapshot.Percent.HasValue ? "下载进度（按大小）" : "下载进度（按文件数）",
-            snapshot.Percent ?? filePercent);
+        var percent = snapshot.Status is DownloadStatus.Queued or DownloadStatus.Running
+            ? snapshot.Percent ?? filePercent : null;
+        return new(status, $"{files} · {transfer}", snapshot.Percent.HasValue ? "文件下载进度（按大小）" : "文件下载进度（按文件数）",
+            percent, snapshot.Phase, snapshot.Error);
     }
 
     private static IReadOnlyList<DownloadFileRow> DescribeFiles(DownloadSnapshot snapshot) =>
         snapshot.Items.Where(item => item.Status is DownloadItemStatus.Downloading or DownloadItemStatus.Processing
-            or DownloadItemStatus.Paused or DownloadItemStatus.Retrying)
+            or DownloadItemStatus.Paused or DownloadItemStatus.Retrying or DownloadItemStatus.Failed or DownloadItemStatus.Canceled)
             .Select(item => new DownloadFileRow(item.Id, item.Name, DescribeFile(item))).ToArray();
 
     private static string DescribeFile(DownloadItemSnapshot item)
@@ -140,12 +149,15 @@ public sealed class DownloadTaskViewModel : INotifyPropertyChanged
             DownloadItemStatus.Processing => "处理中",
             DownloadItemStatus.Paused => "已暂停",
             DownloadItemStatus.Retrying => "等待重试",
+            DownloadItemStatus.Failed => "失败",
+            DownloadItemStatus.Canceled => "已取消",
             _ => "下载中"
         };
-        return $"{state} · {DownloadQueueViewModel.FormatTransfer(item.DownloadedBytes, item.TotalBytes)}";
+        var transfer = $"{state} · {DownloadQueueViewModel.FormatTransfer(item.DownloadedBytes, item.TotalBytes)}";
+        return string.IsNullOrWhiteSpace(item.Error) ? transfer : $"{transfer} · {item.Error}";
     }
 
-    private sealed record TaskProgress(string Status, string Summary, string Label, double? Percent);
+    private sealed record TaskProgress(string Status, string Summary, string Label, double? Percent, string? Phase, string? Error);
 }
 
 public sealed record DownloadFileRow(Guid Id, string Name, string Summary);

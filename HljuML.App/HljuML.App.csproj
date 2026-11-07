@@ -26,6 +26,7 @@
     <ItemGroup>
         <AvaloniaResource Include="Assets/player-placeholder.png" />
         <AvaloniaResource Include="Assets/instance_icon_default.jpg" />
+        <AvaloniaResource Include="Assets/loaders/**" />
     </ItemGroup>
 
     <ItemGroup>
@@ -39,6 +40,9 @@
       </Compile>
       <Compile Update="Views\InstancePickerWindow.axaml.cs">
         <DependentUpon>InstancePickerWindow.axaml</DependentUpon>
+      </Compile>
+      <Compile Update="Views\GameDownloadView.axaml.cs">
+        <DependentUpon>GameDownloadView.axaml</DependentUpon>
       </Compile>
     </ItemGroup>
 </Project>

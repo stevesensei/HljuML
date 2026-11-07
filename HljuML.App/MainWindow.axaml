@@ -13,6 +13,7 @@
         RequestedThemeVariant="Light" Background="Transparent"
         TransparencyLevelHint="Transparent" TransparencyBackgroundFallback="{StaticResource CanvasBrush}">
     <Window.Resources>
+        <vm:UniformThicknessConverter x:Key="UniformThicknessConverter" />
         <LinearGradientBrush x:Key="CanvasBrush" StartPoint="0%,0%" EndPoint="85%,100%">
             <GradientStop Color="#E8F6FF" Offset="0" />
             <GradientStop Color="#88C5F0" Offset="1" />
@@ -95,7 +96,7 @@
 
     <Grid>
         <Border x:Name="WindowFrame" Classes="rounded-window" Background="{StaticResource CanvasBrush}" />
-        <Grid Margin="24,0" RowDefinitions="Auto,*,Auto">
+        <Grid Margin="24,0" RowDefinitions="Auto,*,Auto,Auto">
             <Border Classes="floating" Margin="0,16,0,8" MaxWidth="864">
                 <Grid ColumnDefinitions="*,Auto,*" ColumnSpacing="12">
                     <Border Background="Transparent" WindowDecorationProperties.ElementRole="TitleBar">
@@ -214,20 +215,11 @@
                                 </StackPanel>
                             </Border>
 
-                            <arc:Card Title="下载队列" Description="{Binding Downloads.Summary}">
-                                <arc:Card.Action>
-                                    <arc:Button Size="Small" Variant="Secondary"
-                                                IsVisible="{Binding Downloads.HasActiveDownloads}"
-                                                Content="打开下载管理器" Click="OnDownloadsClicked" />
-                                </arc:Card.Action>
-                            </arc:Card>
+                            <arc:Card Title="下载队列" Description="{Binding Downloads.Summary}" />
                             <arc:Card Title="最近游玩" Description="游玩记录区域 · 占位" />
                             <arc:Card Title="Minecraft 资讯" Description="游戏更新与公告 · 占位" />
                         </layout:MasonryPanel>
                     </StackPanel>
-
-                    <views:DownloadManagerView x:Name="DownloadsPage" IsVisible="False"
-                                               DataContext="{Binding Downloads}" />
 
                     <StackPanel x:Name="SettingsPage" IsVisible="False" Spacing="{arc:ArcDesignTokenResource Space4}">
                         <TextBlock Classes="heading" Text="设置" FontSize="{arc:ArcDesignTokenResource Type3XL}" />
@@ -236,9 +228,19 @@
                 </Grid>
             </ScrollViewer>
 
+            <views:DownloadHubView x:Name="DownloadsPage" Grid.Row="1" IsVisible="False"
+                                    MaxWidth="1080" Tag="{arc:ArcDesignTokenResource Space4}"
+                                    Margin="{Binding $self.Tag, Converter={StaticResource UniformThicknessConverter}}"
+                                    DataContext="{Binding DownloadHub}" />
+
             <arc:ToastStack Grid.Row="1" Label="通知" IsContained="True" />
 
-            <Border Grid.Row="2" Classes="floating" Margin="0,8,0,16" MaxWidth="1040"
+            <arc:Button Grid.Row="2" Size="Small" Variant="Secondary"
+                        HorizontalAlignment="Center" Content="查看下载管理器"
+                        IsVisible="{Binding Downloads.HasPendingOrFailedTasks}"
+                        Click="OnDownloadManagerClicked" />
+
+            <Border Grid.Row="3" Classes="floating" Margin="0,8,0,16" MaxWidth="1040"
                     SizeChanged="OnLaunchDockSizeChanged">
                 <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="{arc:ArcDesignTokenResource Space3}">
                     <arc:Button x:Name="AccountButton" Classes="dock-selection account-selection"
