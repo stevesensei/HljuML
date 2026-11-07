@@ -40,6 +40,25 @@ namespace HljuML.Core.Model.Entity.Migrations
                     b.ToTable("CustomAuthServers");
                 });
 
+            modelBuilder.Entity("HljuML.Core.Model.Entity.GameFolder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AbsolutePath")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("GameFolders");
+                });
+
             modelBuilder.Entity("HljuML.Core.Model.Entity.GameInstanceData", b =>
                 {
                     b.Property<Guid>("Id")
@@ -48,6 +67,9 @@ namespace HljuML.Core.Model.Entity.Migrations
 
                     b.Property<string>("Avatar")
                         .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("GameFolderId")
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("LastLogin")
@@ -68,6 +90,8 @@ namespace HljuML.Core.Model.Entity.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("GameFolderId");
 
                     b.HasIndex("LastUsedPlayerId");
 
@@ -108,9 +132,15 @@ namespace HljuML.Core.Model.Entity.Migrations
 
             modelBuilder.Entity("HljuML.Core.Model.Entity.GameInstanceData", b =>
                 {
+                    b.HasOne("HljuML.Core.Model.Entity.GameFolder", "GameFolder")
+                        .WithMany()
+                        .HasForeignKey("GameFolderId");
+
                     b.HasOne("HljuML.Core.Model.Entity.PlayerProfile", "LastUsedPlayer")
                         .WithMany()
                         .HasForeignKey("LastUsedPlayerId");
+
+                    b.Navigation("GameFolder");
 
                     b.Navigation("LastUsedPlayer");
                 });

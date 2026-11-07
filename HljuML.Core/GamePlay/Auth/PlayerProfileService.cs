@@ -5,6 +5,7 @@ using ColorMC.Core.Game;
 using ColorMC.Core.GuiHandle;
 using ColorMC.Core.Helpers;
 using ColorMC.Core.Net.Apis;
+using ColorMC.Core.Net.Login;
 using ColorMC.Core.Objs;
 using ColorMC.Core.Objs.Login;
 using HljuML.Core.Infrastructure.Storage;
@@ -120,7 +121,7 @@ public class PlayerProfileService(HljuMLDbContext db, AuthServerService authServ
         _ => profile.CustomAuthServer?.Name ?? "外置登录"
     };
 
-    internal static ServiceResult<LoginObj> GetLaunchLogin(PlayerProfile profile)
+    internal async Task<ServiceResult<LoginObj>> GetLaunchLogin(PlayerProfile profile, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(profile.PlayerName))
             return ServiceResult<LoginObj>.FailureResult(message: "玩家档案缺少玩家名。");
@@ -137,9 +138,22 @@ public class PlayerProfileService(HljuMLDbContext db, AuthServerService authServ
         }
 
         var cached = ReadLoginCache(profile);
-        return cached is not null && IsValidLaunchLogin(profile, cached)
-            ? ServiceResult<LoginObj>.SuccessResult(cached)
-            : ServiceResult<LoginObj>.FailureResult(message: "玩家档案缺少有效的登录信息，请重新登录。");
+        if (cached is null || !IsValidLaunchLogin(profile, cached))
+            return ServiceResult<LoginObj>.FailureResult(message: "玩家档案缺少有效的登录信息，请重新登录。");
+
+        if (profile.AuthMethod != AuthMethod.Custom)
+            return ServiceResult<LoginObj>.SuccessResult(cached);
+
+        var refreshed = await RefreshCustomLogin(cached, cancellationToken);
+        if (refreshed.Data is not { } login)
+            return refreshed;
+
+        // A successful refresh may have invalidated the old token even if launch is canceled.
+        if (!await SaveRefreshedLogin(profile, login, CancellationToken.None))
+            return ServiceResult<LoginObj>.FailureResult(message: "玩家档案已变更，请重新登录。");
+
+        cancellationToken.ThrowIfCancellationRequested();
+        return refreshed;
     }
 
     private static bool IsValidLaunchLogin(PlayerProfile profile, LoginObj login) => profile.AuthMethod switch
@@ -327,7 +341,7 @@ public class PlayerProfileService(HljuMLDbContext db, AuthServerService authServ
             if (ReadCachedLogin(profile, serverUrl) is not { } cached)
                 return ServiceResult<PlayerProfile>.FailureResult(message: "请使用账号和密码重新登录。");
 
-            loginResult = await AuthenticateCustom(serverUrl, () => cached.RefreshTokenAsync(cancellationToken), cancellationToken);
+            loginResult = await RefreshCustomLogin(cached, cancellationToken);
         }
 
         if (loginResult.Data is not { } login)
@@ -337,6 +351,14 @@ public class PlayerProfileService(HljuMLDbContext db, AuthServerService authServ
             ? ServiceResult<PlayerProfile>.SuccessResult(profile)
             : ServiceResult<PlayerProfile>.FailureResult(message: "玩家档案已变更，请重新登录。");
     }
+
+    private static Task<ServiceResult<LoginObj>> RefreshCustomLogin(LoginObj login, CancellationToken cancellationToken) =>
+        AuthenticateCustom(login.Text1, async () =>
+        {
+            var refreshed = await AuthlibInjector.RefreshAsync(login, cancellationToken);
+            refreshed.LastLogin = DateTime.Now;
+            return refreshed;
+        }, cancellationToken);
 
     internal async Task<bool> SaveRefreshedLogin(PlayerProfile profile, LoginObj login, CancellationToken cancellationToken)
     {

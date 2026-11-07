@@ -13,7 +13,8 @@ public partial class InstancePickerWindow : Window
 {
     public InstancePickerWindow() => InitializeComponent();
 
-    internal InstancePickerWindow(IReadOnlyList<GameInstanceData> instances, Guid? selectedId, string? error) : this()
+    internal InstancePickerWindow(IReadOnlyList<GameInstanceData> instances, IReadOnlyList<GameFolder> folders,
+        Guid? selectedId, string? error) : this()
     {
         if (error is not null)
         {
@@ -23,9 +24,13 @@ public partial class InstancePickerWindow : Window
         }
 
         var rows = instances.Select(instance => new InstancePickerRow(instance, LoaderName(instance.Loader))).ToArray();
-        var groups = new List<InstancePickerGroup> { new("全部实例", rows) };
-        groups.AddRange(rows.GroupBy(row => row.Instance.Loader).OrderBy(group => group.Key)
-            .Select(group => new InstancePickerGroup(LoaderName(group.Key), group.ToArray())));
+        var groups = new List<InstancePickerGroup> { new("全部实例", null, rows) };
+        var rowsByFolder = rows.ToLookup(row => row.Instance.GameFolderId);
+        groups.AddRange(folders.Select(folder =>
+            new InstancePickerGroup(folder.Name, folder.AbsolutePath, rowsByFolder[folder.Id].ToArray())));
+        var unassigned = rowsByFolder[null].ToArray();
+        if (unassigned.Length > 0)
+            groups.Add(new InstancePickerGroup("未分配目录", null, unassigned));
 
         GroupsList.ItemsSource = groups;
         GroupsList.SelectedIndex = 0;
@@ -74,9 +79,10 @@ public partial class InstancePickerWindow : Window
     };
 }
 
-public sealed record InstancePickerGroup(string Name, IReadOnlyList<InstancePickerRow> Instances)
+public sealed record InstancePickerGroup(string Name, string? AbsolutePath, IReadOnlyList<InstancePickerRow> Instances)
 {
     public int Count => Instances.Count;
+    public bool HasPath => !string.IsNullOrWhiteSpace(AbsolutePath);
 }
 
 public sealed record InstancePickerRow(GameInstanceData Instance, string Loader)

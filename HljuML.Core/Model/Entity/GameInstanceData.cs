@@ -15,6 +15,9 @@ public class GameInstanceData
     public string Version { get; set; } = string.Empty;
     public Loaders Loader { get; set; }
     public DateTime LastLogin { get; set; }
+
+    public Guid? GameFolderId { get; set; }
+    public GameFolder? GameFolder { get; set; }
     
     public Guid? LastUsedPlayerId { get; set; }
     public PlayerProfile? LastUsedPlayer { get; set; }

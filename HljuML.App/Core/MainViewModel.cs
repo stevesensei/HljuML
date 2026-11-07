@@ -52,6 +52,7 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
     public bool HasSelectedInstance => _selectedInstance is not null;
     public string AuthenticationMethod => _selectedProfile?.AuthenticationMethod ?? "未选择档案";
     internal IReadOnlyList<GameInstanceData> AvailableInstances { get; private set; } = [];
+    internal IReadOnlyList<GameFolder> AvailableFolders { get; private set; } = [];
     internal Guid? SelectedInstanceId => _selectedInstance?.Id;
     internal string? LaunchOptionsError => _optionsError;
     public IReadOnlyList<RunningGameInstance> RunningInstances { get; private set; }
@@ -92,6 +93,7 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
             await using var scope = _scopeFactory.CreateAsyncScope();
             var profiles = await scope.ServiceProvider.GetRequiredService<PlayerProfileService>().GetAllPlayerProfiles(token);
             AvailableInstances = await _gameInstances.GetGameInstances(token);
+            AvailableFolders = await _gameInstances.GetGameFolders(token);
             _profiles = (profiles.Data ?? []).Select(profile => new ProfileOption(profile.Id, profile.PlayerName,
                 PlayerProfileService.DescribeAuthentication(profile), profile.AuthMethod, profile.AuthServerId)).ToArray();
             _optionsError = null;

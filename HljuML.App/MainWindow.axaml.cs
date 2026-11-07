@@ -90,7 +90,7 @@ public partial class MainWindow : Window
         if (!IsVisible)
             return;
 
-        var picker = new InstancePickerWindow(viewModel.AvailableInstances, viewModel.SelectedInstanceId,
+        var picker = new InstancePickerWindow(viewModel.AvailableInstances, viewModel.AvailableFolders, viewModel.SelectedInstanceId,
             viewModel.LaunchOptionsError)
         {
             Width = Math.Clamp(Bounds.Width - 32, 520, 880),

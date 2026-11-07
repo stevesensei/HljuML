@@ -59,14 +59,20 @@
                 <Border Background="{arc:ArcDesignTokenResource SurfaceMuted}" Padding="8"
                         CornerRadius="{arc:ArcDesignTokenResource RadiusPanel}">
                     <Grid RowDefinitions="Auto,*" RowSpacing="{arc:ArcDesignTokenResource Space2}">
-                        <TextBlock Classes="picker-secondary" Text="加载器" Margin="8,4,0,0" />
+                        <TextBlock Classes="picker-secondary" Text="游戏文件夹" Margin="8,4,0,0" />
                         <ListBox x:Name="GroupsList" Grid.Row="1" Classes="picker-list"
-                                 SelectionChanged="OnGroupChanged" AutomationProperties.Name="加载器分组">
+                                 SelectionChanged="OnGroupChanged" AutomationProperties.Name="游戏文件夹筛选">
                             <ListBox.ItemTemplate>
                                 <DataTemplate x:DataType="local:InstancePickerGroup">
                                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{arc:ArcDesignTokenResource Space2}">
-                                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Grid.Column="1" Classes="picker-secondary" Text="{Binding Count}" />
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding AbsolutePath}" IsVisible="{Binding HasPath}"
+                                                       ToolTip.Tip="{Binding AbsolutePath}" Classes="picker-secondary"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="1" Classes="picker-secondary" Text="{Binding Count}"
+                                                   VerticalAlignment="Center" />
                                     </Grid>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
