@@ -8,7 +8,9 @@ public static class LauncherPaths
 
     public static string ColorMcDirectory => Path.Combine(LauncherDirectory, "HljuML");
 
-    public static bool IsLauncherDirectory(string path) => GameFolderPathsEqual(path, LauncherDirectory);
+    public static string JavaSettingsPath => Path.Combine(ColorMcDirectory, "java-settings.json");
+
+    public static bool IsDefaultInstanceDirectory(string path) => GameFolderPathsEqual(path, DefaultInstanceDirectory);
 
     internal static bool GameFolderPathsEqual(string first, string second) =>
         Path.IsPathFullyQualified(first) && Path.IsPathFullyQualified(second)
@@ -31,6 +33,6 @@ public static class LauncherPaths
 
     internal static string LegacyDatabasePath => Path.Combine(ColorMcDirectory, "launcher.db");
 
-    internal static string DefaultInstanceDirectory =>
+    public static string DefaultInstanceDirectory =>
         Path.Combine(ColorMcDirectory, Names.NameMinecraftKey, Names.NameInstanceDir);
 }

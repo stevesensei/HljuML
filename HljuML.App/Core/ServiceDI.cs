@@ -24,6 +24,7 @@ public static class ServiceCollectionExtensions
         collection.AddSingleton<JavaEnvService>();
         collection.AddSingleton<GameInstanceService>();
         collection.AddHostedService(services => services.GetRequiredService<GameInstanceService>());
+        collection.AddHostedService(services => services.GetRequiredService<JavaEnvService>());
         collection.AddSingleton<DownloadManagementService>();
         collection.AddHostedService(services => services.GetRequiredService<DownloadManagementService>());
         collection.AddSingleton<MainViewModel>();

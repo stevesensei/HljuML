@@ -1,12 +1,155 @@
+using System.Text.Json;
 using ColorMC.Core.Helpers;
 using ColorMC.Core.LaunchPath;
 using ColorMC.Core.Objs;
 using ColorMC.Core.Utils;
+using HljuML.Core.Infrastructure.Storage;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace HljuML.Core.GamePlay;
 
-public sealed class JavaEnvService
+public sealed class JavaEnvService : BackgroundService
 {
+    private readonly ILogger<JavaEnvService> _logger;
+    private readonly object _sync = new();
+    private Task<IReadOnlyList<JavaInfoObj>>? _scanTask;
+    private IReadOnlyList<JavaInfoObj> _environments = [];
+    private string _defaultJavaPath = "";
+    private bool _isScanning;
+    private string? _scanError;
+
+    public JavaEnvService(ILogger<JavaEnvService> logger)
+    {
+        _logger = logger;
+        try
+        {
+            if (File.Exists(LauncherPaths.JavaSettingsPath))
+                _defaultJavaPath = JsonSerializer.Deserialize<JavaPreferences>(
+                    File.ReadAllText(LauncherPaths.JavaSettingsPath))?.DefaultJavaPath ?? "";
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException)
+        {
+            logger.LogWarning(error, "Could not read the default Java setting");
+            _scanError = "无法读取 Java 设置，请重新选择默认环境。";
+        }
+    }
+
+    public event Action? Changed;
+
+    public IReadOnlyList<JavaInfoObj> Environments
+    {
+        get { lock (_sync) return _environments; }
+    }
+
+    public string DefaultJavaPath
+    {
+        get { lock (_sync) return _defaultJavaPath; }
+    }
+
+    public bool IsScanning
+    {
+        get { lock (_sync) return _isScanning; }
+    }
+
+    public string? ScanError
+    {
+        get { lock (_sync) return _scanError; }
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        try
+        {
+            await ScanAsync(stoppingToken);
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
+    }
+
+    public Task<IReadOnlyList<JavaInfoObj>> ScanAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        Task<IReadOnlyList<JavaInfoObj>> scan;
+        lock (_sync)
+        {
+            if (!_isScanning)
+            {
+                _isScanning = true;
+                _scanTask = Task.Run(ScanCoreAsync);
+            }
+            scan = _scanTask!;
+        }
+        Changed?.Invoke();
+        return scan.WaitAsync(cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<JavaInfoObj>> ScanCoreAsync()
+    {
+        try
+        {
+            var found = await JavaHelper.FindJava() ?? [];
+            var paths = new List<string> { DefaultJavaPath };
+            if (Environment.GetEnvironmentVariable("JAVA_HOME") is { Length: > 0 } javaHome)
+                paths.Add(Path.Combine(javaHome, "bin", OperatingSystem.IsWindows() ? "javaw.exe" : "java"));
+            if (Directory.Exists(JvmPath.JavaDir))
+                found.AddRange(await Task.Run(() => JavaHelper.FindJava(JvmPath.JavaDir) ?? []));
+
+            foreach (var path in paths.Where(File.Exists))
+            {
+                if (await Task.Run(() => JavaHelper.GetJavaInfo(path)) is { } java)
+                    found.Add(java);
+            }
+
+            var comparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+            var environments = found.Where(java => File.Exists(java.Path))
+                .DistinctBy(java => Path.GetFullPath(java.Path), comparer)
+                .OrderByDescending(java => java.MajorVersion)
+                .ThenBy(java => java.Version).ThenBy(java => java.Path, comparer).ToArray();
+            lock (_sync)
+            {
+                _environments = environments;
+                _scanError = null;
+            }
+            return environments;
+        }
+        catch (Exception error)
+        {
+            _logger.LogWarning(error, "Could not scan Java environments");
+            lock (_sync) _scanError = "扫描 Java 失败，请检查安装目录权限后重试。";
+            return Environments;
+        }
+        finally
+        {
+            lock (_sync) _isScanning = false;
+            Changed?.Invoke();
+        }
+    }
+
+    public void SetDefaultJavaPath(string path)
+    {
+        lock (_sync)
+        {
+            if (path.Length > 0 && (!Path.IsPathFullyQualified(path) || !File.Exists(path)
+                || !_environments.Any(java => string.Equals(java.Path, path, OperatingSystem.IsWindows()
+                    ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))))
+                throw new ArgumentException("请选择扫描到的可用 Java 环境。", nameof(path));
+
+            Directory.CreateDirectory(LauncherPaths.ColorMcDirectory);
+            var temporary = Path.Combine(LauncherPaths.ColorMcDirectory, $".java-{Guid.NewGuid():N}.tmp");
+            try
+            {
+                File.WriteAllText(temporary, JsonSerializer.Serialize(new JavaPreferences(path)));
+                File.Move(temporary, LauncherPaths.JavaSettingsPath, overwrite: true);
+            }
+            finally
+            {
+                File.Delete(temporary);
+            }
+            _defaultJavaPath = path;
+        }
+        Changed?.Invoke();
+    }
+
     public async Task<JavaInfoObj?> FindForMinecraftVersionAsync(string minecraftVersion,
         CancellationToken cancellationToken = default)
     {
@@ -45,9 +188,12 @@ public sealed class JavaEnvService
                 return fromEnvironment;
         }
 
-        var discovered = await JavaHelper.FindJava();
+        IReadOnlyList<JavaInfoObj> discovered;
+        lock (_sync) discovered = _environments;
+        if (discovered.Count == 0 || IsScanning)
+            discovered = await ScanAsync(cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
-        var candidates = (discovered ?? []).Concat(new[] { registered, fromEnvironment }).OfType<JavaInfoObj>();
+        var candidates = discovered.Concat(new[] { registered, fromEnvironment }).OfType<JavaInfoObj>();
         return MatchInstalledJava(candidates, majorVersion);
     }
 
@@ -75,4 +221,6 @@ public sealed class JavaEnvService
         .ThenByDescending(item => item.Arch == SystemInfo.SystemArch)
         .ThenByDescending(item => item.MajorVersion)
         .FirstOrDefault();
+
+    private sealed record JavaPreferences(string DefaultJavaPath);
 }

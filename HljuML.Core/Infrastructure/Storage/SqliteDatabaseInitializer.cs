@@ -17,9 +17,9 @@ public sealed class SqliteDatabaseInitializer(IServiceScopeFactory scopeFactory)
         if (Path.GetDirectoryName(databasePath) is { Length: > 0 } directory)
             Directory.CreateDirectory(directory);
 
-        ImportLegacyDatabase(databasePath, cancellationToken);
+        //ImportLegacyDatabase(databasePath, cancellationToken);
         await context.Database.MigrateAsync(cancellationToken);
-        await AssignDefaultGameFolder(context, cancellationToken);
+        //await AssignDefaultGameFolder(context, cancellationToken);
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -65,7 +65,7 @@ public sealed class SqliteDatabaseInitializer(IServiceScopeFactory scopeFactory)
         var folder = await context.GameFolders.FirstOrDefaultAsync(item => item.AbsolutePath == path, cancellationToken);
         if (folder is null)
         {
-            folder = new GameFolder { Id = Guid.NewGuid(), AbsolutePath = path, Name = "默认实例目录" };
+            folder = new GameFolder { Id = Guid.NewGuid(), AbsolutePath = path, Name = "实例目录" };
             context.GameFolders.Add(folder);
             await context.SaveChangesAsync(cancellationToken);
         }

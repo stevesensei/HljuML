@@ -3,6 +3,7 @@ using ColorMC.Core;
 using ColorMC.Core.LaunchPath;
 using ColorMC.Core.Objs;
 using ColorMC.Core.Utils;
+using HljuML.Core.Infrastructure.Storage;
 using HljuML.Core.Model.Entity;
 using HljuML.Shared.Model;
 
@@ -10,6 +11,25 @@ namespace HljuML.Core.GamePlay;
 
 internal static class ColorMcInstanceFolder
 {
+    internal static string? GetResourceDirectory(string instanceDirectory)
+    {
+        if (LauncherPaths.IsDefaultInstanceDirectory(instanceDirectory))
+            return null;
+
+        var directory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(instanceDirectory));
+        var parent = Path.GetDirectoryName(directory);
+        if (parent is null)
+            return null;
+
+        // ColorMC keeps shared resources alongside its instances directory.
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        var hasColorMcLayout = string.Equals(Path.GetFileName(directory), Names.NameInstanceDir, comparison)
+            && string.Equals(Path.GetFileName(parent), Names.NameMinecraftKey, comparison);
+        var hasSharedFiles = Directory.Exists(Path.Combine(parent, Names.NameVersionDir))
+            && Directory.Exists(Path.Combine(parent, Names.NameLibDir));
+        return hasColorMcLayout || hasSharedFiles ? parent : null;
+    }
+
     internal static IEnumerable<GameSettingObj> ReadInstances(string path, CancellationToken token)
     {
         foreach (var directory in Directory.EnumerateDirectories(path, "*", new EnumerationOptions

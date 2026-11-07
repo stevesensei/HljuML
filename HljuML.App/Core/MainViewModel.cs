@@ -36,12 +36,13 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
     private GameLaunchProgress? _progress;
 
     public MainViewModel(GameInstanceService gameInstances, IHostApplicationLifetime appLifetime,
-        IServiceScopeFactory scopeFactory, DownloadManagementService downloads)
+        IServiceScopeFactory scopeFactory, DownloadManagementService downloads, JavaEnvService java)
     {
         _gameInstances = gameInstances;
         _appLifetime = appLifetime;
         _scopeFactory = scopeFactory;
         Downloads = new DownloadQueueViewModel(downloads);
+        JavaSettings = new JavaSettingsViewModel(java, appLifetime.ApplicationStopping);
         RunningInstances = _gameInstances.GetRunningInstances();
         _gameInstances.RunningInstancesChanged += OnRunningInstancesChanged;
     }
@@ -49,6 +50,7 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public DownloadQueueViewModel Downloads { get; }
+    public JavaSettingsViewModel JavaSettings { get; }
 
     public string PlayerName => _selectedProfile?.Name ?? "选择玩家";
     public object PlayerAvatar => GetPlayerAvatar(_selectedProfile?.Id);
@@ -276,6 +278,7 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
     public void Dispose()
     {
         _disposed = true;
+        JavaSettings.Dispose();
         _gameInstances.RunningInstancesChanged -= OnRunningInstancesChanged;
         foreach (var avatar in _playerAvatars.Values)
             avatar.Dispose();

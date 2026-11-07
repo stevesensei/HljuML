@@ -79,8 +79,8 @@
                             </ListBox.ItemTemplate>
                         </ListBox>
                         <StackPanel x:Name="FolderActions" Grid.Row="2" Spacing="{arc:ArcDesignTokenResource Space1}">
-                            <arc:Button x:Name="CurrentFolderButton" Content="添加当前目录" Size="Small" Variant="Secondary"
-                                        Padding="8,0" HorizontalAlignment="Stretch" Click="OnAddCurrentFolderClicked" />
+                            <arc:Button x:Name="DefaultFolderButton" Content="添加默认目录" Size="Small" Variant="Secondary"
+                                        Padding="8,0" HorizontalAlignment="Stretch" Click="OnAddDefaultFolderClicked" />
                             <arc:Button Content="添加其他目录" Size="Small" Variant="Ghost"
                                         Padding="8,0" HorizontalAlignment="Stretch" Click="OnBrowseFolderClicked" />
                         </StackPanel>

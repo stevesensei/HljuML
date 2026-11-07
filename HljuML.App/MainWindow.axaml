@@ -229,9 +229,9 @@
                     <views:DownloadManagerView x:Name="DownloadsPage" IsVisible="False"
                                                DataContext="{Binding Downloads}" />
 
-                    <StackPanel x:Name="SettingsPage" IsVisible="False" Spacing="12">
+                    <StackPanel x:Name="SettingsPage" IsVisible="False" Spacing="{arc:ArcDesignTokenResource Space4}">
                         <TextBlock Classes="heading" Text="设置" FontSize="{arc:ArcDesignTokenResource Type3XL}" />
-                        <arc:Card Title="启动器设置" Description="此处预留账号与启动配置。" />
+                        <views:JavaSettingsView DataContext="{Binding JavaSettings}" />
                     </StackPanel>
                 </Grid>
             </ScrollViewer>

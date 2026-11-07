@@ -1,0 +1,27 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:arc="https://github.com/AIDotNet/TKCode.Arc"
+             xmlns:vm="using:HljuML.App.Core"
+             x:Class="HljuML.App.Views.JavaSettingsView"
+             x:DataType="vm:JavaSettingsViewModel">
+    <arc:Card Title="Java 运行环境" Description="选择立即保存，实例配置优先。">
+        <StackPanel Spacing="{arc:ArcDesignTokenResource Space4}">
+            <arc:Select Label="默认 Java 环境"
+                        ItemsSource="{Binding JavaOptions}"
+                        SelectedItem="{Binding SelectedJavaOption, Mode=TwoWay}"
+                        IsEnabled="{Binding CanScan}"
+                        HorizontalAlignment="Stretch" />
+            <TextBlock Text="{Binding SelectedPathDescription}" TextWrapping="Wrap"
+                       Foreground="{arc:ArcDesignTokenResource TextSecondary}"
+                       FontSize="{arc:ArcDesignTokenResource TypeSM}" />
+            <arc:Button Content="扫描 Java" Variant="Secondary" IsLoading="{Binding IsScanning}"
+                        IsEnabled="{Binding CanScan}" Click="OnScanJavaClicked"
+                        HorizontalAlignment="Left" />
+            <TextBlock Text="{Binding ScanStatus}" TextWrapping="Wrap"
+                       Foreground="{arc:ArcDesignTokenResource TextSecondary}"
+                       FontSize="{arc:ArcDesignTokenResource TypeSM}" />
+            <arc:Alert Title="Java 设置需要处理" Content="{Binding ErrorMessage}"
+                       Tone="Danger" IsVisible="{Binding HasError}" />
+        </StackPanel>
+    </arc:Card>
+</UserControl>

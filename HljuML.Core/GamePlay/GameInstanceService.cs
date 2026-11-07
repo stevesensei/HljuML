@@ -63,7 +63,7 @@ public sealed class GameInstanceService(IServiceScopeFactory scopeFactory, JavaE
             var folder = folders.FirstOrDefault(item => LauncherPaths.GameFolderPathsEqual(item.AbsolutePath, path));
             if (folder is null)
             {
-                var name = LauncherPaths.IsLauncherDirectory(path) ? "当前启动器目录" : Path.GetFileName(path);
+                var name = LauncherPaths.IsDefaultInstanceDirectory(path) ? "默认实例目录" : Path.GetFileName(path);
                 folder = new GameFolder { Id = Guid.NewGuid(), AbsolutePath = path,
                     Name = string.IsNullOrEmpty(name) ? path : name };
                 db.GameFolders.Add(folder);
@@ -126,13 +126,27 @@ public sealed class GameInstanceService(IServiceScopeFactory scopeFactory, JavaE
             if (gameResult.Data is not { } game)
                 return ServiceResult<int?>.FailureResult(message: gameResult.Message);
 
-            if (game.Loader == Loaders.Normal && string.IsNullOrWhiteSpace(game.JvmLocal)
+            using var resources = instanceData.GameFolder is { } folder
+                && ColorMcInstanceFolder.GetResourceDirectory(folder.AbsolutePath) is { } resourceDirectory
+                ? MinecraftPath.UseResourceDirectory(resourceDirectory)
+                : null;
+
+            if (string.IsNullOrWhiteSpace(game.JvmLocal)
                 && string.IsNullOrWhiteSpace(game.JvmName))
             {
-                progress?.Report(new("正在匹配 Java 运行环境"));
-                var java = await javaEnvironments.FindForMinecraftVersionAsync(game.Version, stoppingToken);
-                if (java is not null)
-                    game = game with { JvmLocal = java.Path };
+                if (javaEnvironments.DefaultJavaPath is { Length: > 0 } defaultJava)
+                {
+                    if (!File.Exists(defaultJava))
+                        return ServiceResult<int?>.FailureResult(message: "默认 Java 已不可用，请在设置中重新扫描并选择。");
+                    game = game with { JvmLocal = defaultJava };
+                }
+                else if (game.Loader == Loaders.Normal)
+                {
+                    progress?.Report(new("正在匹配 Java 运行环境"));
+                    var java = await javaEnvironments.FindForMinecraftVersionAsync(game.Version, stoppingToken);
+                    if (java is not null)
+                        game = game with { JvmLocal = java.Path };
+                }
             }
 
             var reporter = progress is null ? null : new GameLaunchReporter(progress);
@@ -218,8 +232,7 @@ public sealed class GameInstanceService(IServiceScopeFactory scopeFactory, JavaE
     private static async Task<ServiceResult<GameSettingObj>> ResolveGame(GameInstanceData instance,
         IProgress<GameLaunchProgress>? progress, CancellationToken cancellationToken)
     {
-        if (instance.GameFolder is { } folder
-            && !LauncherPaths.GameFolderPathsEqual(folder.AbsolutePath, LauncherPaths.DefaultInstanceDirectory))
+        if (instance.GameFolder is { } folder && !LauncherPaths.IsDefaultInstanceDirectory(folder.AbsolutePath))
             return await ColorMcInstanceFolder.ResolveAsync(instance, folder.AbsolutePath, progress, cancellationToken);
 
         if (InstancesPath.GetGame(instance.Id) is { } existing)

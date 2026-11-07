@@ -46,18 +46,18 @@ public partial class InstancePickerWindow : Window
         if (unassigned.Length > 0)
             groups.Add(new InstancePickerGroup("未分配目录", null, null, unassigned));
 
-        var currentFolder = viewModel.AvailableFolders.FirstOrDefault(folder => LauncherPaths.IsLauncherDirectory(folder.AbsolutePath));
-        CurrentFolderButton.Content = currentFolder is null ? "添加当前目录" : "扫描当前目录";
+        var defaultFolder = viewModel.AvailableFolders.FirstOrDefault(folder => LauncherPaths.IsDefaultInstanceDirectory(folder.AbsolutePath));
+        DefaultFolderButton.Content = defaultFolder is null ? "添加默认目录" : "扫描默认目录";
         var selected = rows.FirstOrDefault(row => row.Instance.Id == viewModel.SelectedInstanceId);
-        var preferredFolder = folderId ?? selected?.Instance.GameFolderId ?? currentFolder?.Id;
+        var preferredFolder = folderId ?? selected?.Instance.GameFolderId ?? defaultFolder?.Id;
         var group = groups.FirstOrDefault(item => item.FolderId == preferredFolder) ?? groups[0];
         GroupsList.ItemsSource = groups;
         GroupsList.SelectedItem = group;
         InstancesList.SelectedItem = group.Instances.FirstOrDefault(row => row == selected);
     }
 
-    private async void OnAddCurrentFolderClicked(object? sender, RoutedEventArgs e) =>
-        await AddFolderAsync(LauncherPaths.LauncherDirectory);
+    private async void OnAddDefaultFolderClicked(object? sender, RoutedEventArgs e) =>
+        await AddFolderAsync(LauncherPaths.DefaultInstanceDirectory);
 
     private async void OnBrowseFolderClicked(object? sender, RoutedEventArgs e)
     {
@@ -69,7 +69,7 @@ public partial class InstancePickerWindow : Window
             var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
             {
                 Title = "选择游戏实例目录",
-                SuggestedStartLocation = await StorageProvider.TryGetFolderFromPathAsync(LauncherPaths.LauncherDirectory)
+                SuggestedStartLocation = await StorageProvider.TryGetFolderFromPathAsync(LauncherPaths.DefaultInstanceDirectory)
             });
             if (folders.FirstOrDefault() is { } folder)
             {
