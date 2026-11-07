@@ -8,6 +8,7 @@ using ColorMC.Core.LaunchPath;
 using ColorMC.Core.Net;
 using ColorMC.Core.Objs;
 using HljuML.Core.GamePlay.Auth;
+using HljuML.Core.Infrastructure.Downloads;
 using HljuML.Core.Infrastructure.Storage;
 using HljuML.Core.Model.Entity;
 using HljuML.Shared.Model;
@@ -19,7 +20,7 @@ using Microsoft.Extensions.Logging;
 namespace HljuML.Core.GamePlay;
 
 public sealed class GameInstanceService(IServiceScopeFactory scopeFactory, JavaEnvService javaEnvironments,
-    ILogger<GameInstanceService> logger) : IHostedService
+    DownloadManagementService downloads, ILogger<GameInstanceService> logger) : IHostedService
 {
     private readonly ConcurrentDictionary<Guid, RunningProcess> _running = new();
     private readonly SemaphoreSlim _launchGate = new(1, 1);
@@ -44,6 +45,51 @@ public sealed class GameInstanceService(IServiceScopeFactory scopeFactory, JavaE
         var db = scope.ServiceProvider.GetRequiredService<HljuMLDbContext>();
         return await db.GameFolders.AsNoTracking().OrderBy(folder => folder.Name).ThenBy(folder => folder.AbsolutePath)
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<ServiceResult<GameFolder>> AddGameFolderAsync(string path, CancellationToken token = default)
+    {
+        if (!Path.IsPathFullyQualified(path) || !Directory.Exists(path))
+            return ServiceResult<GameFolder>.FailureResult(message: "请选择可访问的游戏文件夹。");
+
+        path = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
+        try
+        {
+            var games = await Task.Run(() => ColorMcInstanceFolder.ReadInstances(path, token).ToArray(), token);
+            await using var scope = scopeFactory.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<HljuMLDbContext>();
+            await using var transaction = await db.Database.BeginTransactionAsync(token);
+            var folders = await db.GameFolders.ToListAsync(token);
+            var folder = folders.FirstOrDefault(item => LauncherPaths.GameFolderPathsEqual(item.AbsolutePath, path));
+            if (folder is null)
+            {
+                var name = LauncherPaths.IsLauncherDirectory(path) ? "当前启动器目录" : Path.GetFileName(path);
+                folder = new GameFolder { Id = Guid.NewGuid(), AbsolutePath = path,
+                    Name = string.IsNullOrEmpty(name) ? path : name };
+                db.GameFolders.Add(folder);
+            }
+
+            var registered = (await db.GameInstances.Select(instance => instance.Id).ToListAsync(token)).ToHashSet();
+            foreach (var group in games.GroupBy(game => game.UUID).Where(group => group.Count() == 1))
+            {
+                var game = group.First();
+                if (!registered.Add(game.UUID))
+                    continue;
+
+                db.GameInstances.Add(new GameInstanceData { Id = game.UUID, GameFolderId = folder.Id,
+                    Name = string.IsNullOrWhiteSpace(game.Name) ? Path.GetFileName(game.DirName) : game.Name,
+                    Version = game.Version, Loader = game.Loader });
+            }
+
+            await db.SaveChangesAsync(token);
+            await transaction.CommitAsync(token);
+            return ServiceResult<GameFolder>.SuccessResult(folder);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or DbException or DbUpdateException)
+        {
+            logger.LogWarning(error, "Failed to register a game folder");
+            return ServiceResult<GameFolder>.FailureResult(message: "无法添加目录，请检查目录权限后重试。");
+        }
     }
 
     public async Task<ServiceResult<int?>> LaunchGameInstance(Guid profileId, Guid instanceId,
@@ -102,19 +148,16 @@ public sealed class GameInstanceService(IServiceScopeFactory scopeFactory, JavaE
 
             if (trackRefresh)
                 ColorMCCore.GameLog += OnGameLog;
-            if (reporter is not null)
-                ColorMCCore.Download += reporter.AttachDownload;
 
             GameHandle? handle;
             try
             {
                 stoppingToken.ThrowIfCancellationRequested();
-                handle = await game.StartGameAsync(args, stoppingToken);
+                handle = await downloads.TrackGameDownloadsAsync(instanceId, instanceData.Name,
+                    () => game.StartGameAsync(args, stoppingToken), progress, stoppingToken);
             }
             finally
             {
-                if (reporter is not null)
-                    ColorMCCore.Download -= reporter.AttachDownload;
                 if (trackRefresh)
                 {
                     ColorMCCore.GameLog -= OnGameLog;
@@ -129,7 +172,7 @@ public sealed class GameInstanceService(IServiceScopeFactory scopeFactory, JavaE
                 return ServiceResult<int?>.FailureResult(message: "游戏进程未启动。");
             }
 
-            var instance = new RunningGameInstance(instanceId, handle.Process.Id, instanceData.Name, args.Auth.UserName,
+            var instance = new RunningGameInstance(instanceId, profile.Id, handle.Process.Id, instanceData.Name, args.Auth.UserName,
                 PlayerProfileService.DescribeAuthentication(profile));
             var running = new RunningProcess(instance, handle);
             handle.Process.Exited += (_, _) => RemoveRunningProcess(running);
@@ -175,8 +218,9 @@ public sealed class GameInstanceService(IServiceScopeFactory scopeFactory, JavaE
     private static async Task<ServiceResult<GameSettingObj>> ResolveGame(GameInstanceData instance,
         IProgress<GameLaunchProgress>? progress, CancellationToken cancellationToken)
     {
-        if (instance.GameFolder is { } folder && !IsColorMcFolder(folder.AbsolutePath))
-            return ServiceResult<GameSettingObj>.FailureResult(message: "ColorMC 当前只支持默认实例目录，无法从此目录启动。");
+        if (instance.GameFolder is { } folder
+            && !LauncherPaths.GameFolderPathsEqual(folder.AbsolutePath, LauncherPaths.DefaultInstanceDirectory))
+            return await ColorMcInstanceFolder.ResolveAsync(instance, folder.AbsolutePath, progress, cancellationToken);
 
         if (InstancesPath.GetGame(instance.Id) is { } existing)
         {
@@ -213,10 +257,6 @@ public sealed class GameInstanceService(IServiceScopeFactory scopeFactory, JavaE
             ? ServiceResult<GameSettingObj>.SuccessResult(created)
             : ServiceResult<GameSettingObj>.FailureResult(message: "无法创建对应的 ColorMC 实例。");
     }
-
-    private static bool IsColorMcFolder(string path) => Path.IsPathFullyQualified(path) && string.Equals(
-        Path.TrimEndingDirectorySeparator(Path.GetFullPath(path)), LauncherPaths.DefaultInstanceDirectory,
-        OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
 
     private async Task SaveLoginAfterLaunch(PlayerProfileService profiles, PlayerProfile profile, GameLaunchArg args)
     {
@@ -312,6 +352,7 @@ public sealed class GameInstanceService(IServiceScopeFactory scopeFactory, JavaE
 
 public sealed record RunningGameInstance(
     Guid Id,
+    Guid ProfileId,
     int ProcessId,
     string InstanceName,
     string PlayerName,

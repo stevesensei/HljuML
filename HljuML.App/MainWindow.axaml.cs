@@ -5,9 +5,9 @@ using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using HljuML.App.Core;
 using HljuML.App.Views;
-using HljuML.Core.GamePlay;
 using HljuML.Core.Model.Entity;
 using HljuML.Shared.Model;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,11 +19,16 @@ namespace HljuML.App;
 public partial class MainWindow : Window
 {
     private readonly IServiceScopeFactory? _scopes;
+    private readonly DispatcherTimer _downloadsTimer = new(DispatcherPriority.Background)
+    {
+        Interval = TimeSpan.FromMilliseconds(400)
+    };
 
     public MainWindow()
     {
         InitializeComponent();
         PropertyChanged += OnWindowPropertyChanged;
+        _downloadsTimer.Tick += (_, _) => RefreshDownloads();
     }
 
     internal MainWindow(IServiceScopeFactory scopes) : this() => _scopes = scopes;
@@ -34,12 +39,40 @@ public partial class MainWindow : Window
     {
         base.OnOpened(e);
         if (DataContext is MainViewModel viewModel)
+        {
+            RefreshDownloads();
+            _downloadsTimer.Start();
             await viewModel.RefreshLaunchOptionsAsync();
+        }
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _downloadsTimer.Stop();
+        base.OnClosed(e);
     }
 
     private void OnHomeClicked(object? sender, RoutedEventArgs e) => ShowPage(HomePage, HomeButton);
 
-    private void OnDownloadsClicked(object? sender, RoutedEventArgs e) => ShowPage(DownloadsPage, DownloadsButton);
+    private void OnDownloadsClicked(object? sender, RoutedEventArgs e)
+    {
+        ShowPage(DownloadsPage, DownloadsButton);
+        RefreshDownloads();
+        if (sender != DownloadsButton)
+            DownloadsButton.Focus();
+    }
+
+    private void RefreshDownloads()
+    {
+        if (DataContext is MainViewModel viewModel)
+            viewModel.Downloads.Refresh(DownloadsPage.IsVisible);
+    }
+
+    private void OnLaunchDockSizeChanged(object? sender, SizeChangedEventArgs e)
+    {
+        if (sender is Border dock)
+            dock.Classes.Set("compact-dock", e.NewSize.Width < 600);
+    }
 
     private void OnSettingsClicked(object? sender, RoutedEventArgs e) => ShowPage(SettingsPage, SettingsButton);
 
@@ -90,8 +123,7 @@ public partial class MainWindow : Window
         if (!IsVisible)
             return;
 
-        var picker = new InstancePickerWindow(viewModel.AvailableInstances, viewModel.AvailableFolders, viewModel.SelectedInstanceId,
-            viewModel.LaunchOptionsError)
+        var picker = new InstancePickerWindow(viewModel)
         {
             Width = Math.Clamp(Bounds.Width - 32, 520, 880),
             Height = Math.Clamp(Bounds.Height - 32, 400, 552)
@@ -132,21 +164,19 @@ public partial class MainWindow : Window
 
     private async void OnLaunchClicked(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is MainViewModel viewModel)
-        {
-            await viewModel.LaunchGameAsync();
-        }
+        if (DataContext is MainViewModel viewModel && await viewModel.LaunchGameAsync() is { } error && IsVisible)
+            Toast.Show(this, "启动失败", ToastKind.Error, error);
     }
 
     private void OnStopInstanceClicked(object? sender, RoutedEventArgs e)
     {
-        if (sender is not ArcButton { DataContext: RunningGameInstance instance } button ||
+        if (sender is not ArcButton { DataContext: RunningInstanceRow row } button ||
             DataContext is not MainViewModel viewModel)
         {
             return;
         }
 
-        var result = viewModel.StopGameInstance(instance);
+        var result = viewModel.StopGameInstance(row.Instance);
         button.Content = result.Status == ServiceStatus.Success ? "结束中…" : "结束失败";
         ToolTip.SetTip(button, result.Message);
     }

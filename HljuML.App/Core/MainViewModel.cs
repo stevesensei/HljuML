@@ -9,6 +9,7 @@ using Avalonia.Threading;
 using HljuML.App.Views;
 using HljuML.Core.GamePlay;
 using HljuML.Core.GamePlay.Auth;
+using HljuML.Core.Infrastructure.Downloads;
 using HljuML.Core.Model.Entity;
 using HljuML.Shared.Model;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,8 +25,9 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
     private IReadOnlyList<ProfileOption> _profiles = [];
     private GameInstanceData? _selectedInstance;
     private ProfileOption? _selectedProfile;
-    private Bitmap? _playerAvatar;
-    private int _avatarRevision;
+    private readonly Dictionary<Guid, Bitmap> _playerAvatars = new();
+    private readonly HashSet<Guid> _avatarLoads = new();
+    private bool _disposed;
     private Guid? _preferredProfileId;
     private bool _isLoading;
     private bool _isLaunching;
@@ -34,19 +36,22 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
     private GameLaunchProgress? _progress;
 
     public MainViewModel(GameInstanceService gameInstances, IHostApplicationLifetime appLifetime,
-        IServiceScopeFactory scopeFactory)
+        IServiceScopeFactory scopeFactory, DownloadManagementService downloads)
     {
         _gameInstances = gameInstances;
         _appLifetime = appLifetime;
         _scopeFactory = scopeFactory;
+        Downloads = new DownloadQueueViewModel(downloads);
         RunningInstances = _gameInstances.GetRunningInstances();
         _gameInstances.RunningInstancesChanged += OnRunningInstancesChanged;
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
+    public DownloadQueueViewModel Downloads { get; }
+
     public string PlayerName => _selectedProfile?.Name ?? "选择玩家";
-    public object PlayerAvatar => _playerAvatar is { } avatar ? avatar : PlayerSkinAvatar.DefaultSource;
+    public object PlayerAvatar => GetPlayerAvatar(_selectedProfile?.Id);
     public string InstanceName => _selectedInstance?.Name ?? "选择实例";
     public string InstanceVersion => _selectedInstance?.Version ?? "在底部选择游戏实例";
     public bool HasSelectedInstance => _selectedInstance is not null;
@@ -56,24 +61,31 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
     internal Guid? SelectedInstanceId => _selectedInstance?.Id;
     internal string? LaunchOptionsError => _optionsError;
     public IReadOnlyList<RunningGameInstance> RunningInstances { get; private set; }
+    public IReadOnlyList<RunningInstanceRow> RunningInstanceRows => RunningInstances
+        .Select(instance => new RunningInstanceRow(instance, GetPlayerAvatar(instance.ProfileId))).ToArray();
     public bool HasRunningInstances => RunningInstances.Count > 0;
+    public bool IsLaunching => _isLaunching;
     public bool CanChangeLaunchSelection => !_isLaunching && !_isLoading;
     public bool CanLaunchGame => !_isLaunching && !_isLoading && _selectedInstance is not null
         && _selectedProfile is not null && !IsSelectedInstanceRunning;
 
-    public string? LaunchError { get; private set; }
-
     public string LaunchLabel => _isLaunching
-        ? "正在启动…"
-        : IsSelectedInstanceRunning
-            ? "运行中"
-            : LaunchError is null ? "启动游戏" : "启动失败 · 重试";
+        ? _progress?.Operation ?? "正在启动"
+        : IsSelectedInstanceRunning ? "运行中" : "启动游戏";
 
-    public string? LaunchStatus => _progress is { } progress ? FormatProgress(progress) : LaunchError ??
-        (IsSelectedInstanceRunning ? "游戏已启动" : _optionsError ?? (
-            _selectedInstance is not null && _selectedProfile is null ? "请选择玩家档案" : null));
+    public string? LaunchDetail => _progress switch
+    {
+        { TotalFiles: > 0 } progress when progress.ProcessedFiles is { } processed =>
+            $"已处理 {processed}/{progress.TotalFiles} 个文件",
+        { FileName: not null } progress =>
+            DownloadQueueViewModel.FormatTransfer(progress.DownloadedBytes, progress.FileBytes),
+        _ => null
+    };
 
-    public bool HasLaunchStatus => LaunchStatus is not null;
+    public bool HasLaunchDetail => LaunchDetail is not null;
+
+    public string? LaunchStatus => _progress is { } progress ? FormatProgress(progress)
+        : _optionsError ?? (_selectedInstance is not null && _selectedProfile is null ? "请选择玩家档案" : null);
 
     private bool IsSelectedInstanceRunning => _selectedInstance is { } selected
         && RunningInstances.Any(instance => instance.Id == selected.Id);
@@ -98,7 +110,7 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
                 PlayerProfileService.DescribeAuthentication(profile), profile.AuthMethod, profile.AuthServerId)).ToArray();
             _optionsError = null;
             ApplySelection(AvailableInstances.FirstOrDefault(item => item.Id == _selectedInstance?.Id),
-                refreshAvatar: preferredProfileId is not null && _playerAvatar is null);
+                refreshAvatar: preferredProfileId is not null);
         }
         catch (OperationCanceledException) when (_appLifetime.ApplicationStopping.IsCancellationRequested) { }
         catch (DbException)
@@ -118,71 +130,73 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
             ApplySelection(instance);
     }
 
+    internal Task<ServiceResult<GameFolder>> AddGameFolderAsync(string path) =>
+        _gameInstances.AddGameFolderAsync(path, _appLifetime.ApplicationStopping);
+
     private void ApplySelection(GameInstanceData? instance, bool refreshAvatar = false)
     {
         var profile = _profiles.FirstOrDefault(item => item.Id == _preferredProfileId)
             ?? _profiles.FirstOrDefault(item => item.Id == instance?.LastUsedPlayerId)
             ?? (_profiles.Count == 1 ? _profiles[0] : null);
         var profileChanged = _selectedProfile != profile;
-        if (_selectedInstance?.Id != instance?.Id || profileChanged)
-            LaunchError = null;
-
         _selectedInstance = instance;
         _selectedProfile = profile;
         Notify(nameof(InstanceName));
         Notify(nameof(InstanceVersion));
         Notify(nameof(HasSelectedInstance));
         Notify(nameof(PlayerName));
+        Notify(nameof(PlayerAvatar));
         Notify(nameof(AuthenticationMethod));
         NotifyLaunchState();
 
-        if (profileChanged || refreshAvatar)
-        {
-            var revision = ++_avatarRevision;
-            SetPlayerAvatar(null);
-            if (profile is { AuthMethod: AuthMethod.Custom })
-                _ = LoadPlayerAvatarAsync(profile.Id, revision);
-        }
+        if ((profileChanged || refreshAvatar) && profile is { AuthMethod: AuthMethod.Custom })
+            _ = LoadPlayerAvatarAsync(profile.Id);
     }
 
-    private async Task LoadPlayerAvatarAsync(Guid profileId, int revision)
+    private object GetPlayerAvatar(Guid? profileId) =>
+        profileId is { } id && _playerAvatars.TryGetValue(id, out var avatar) ? avatar : PlayerSkinAvatar.DefaultSource;
+
+    private async Task LoadPlayerAvatarAsync(Guid profileId)
     {
+        if (_disposed || _playerAvatars.ContainsKey(profileId) || !_avatarLoads.Add(profileId))
+            return;
+
         var token = _appLifetime.ApplicationStopping;
-        PlayerProfile? profile;
         try
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
             var service = scope.ServiceProvider.GetRequiredService<PlayerProfileService>();
-            profile = (await service.GetPlayerProfile(profileId, token)).Data;
+            if ((await service.GetPlayerProfile(profileId, token)).Data is not { AuthMethod: AuthMethod.Custom } profile
+                || token.IsCancellationRequested || _disposed
+                || await PlayerSkinAvatar.LoadAsync(profile, token) is not { } avatar)
+                return;
+
+            if (_disposed || token.IsCancellationRequested)
+            {
+                avatar.Dispose();
+                return;
+            }
+
+            _playerAvatars.Add(profileId, avatar);
+            if (_selectedProfile?.Id == profileId)
+                Notify(nameof(PlayerAvatar));
+            if (RunningInstances.Any(instance => instance.ProfileId == profileId))
+                Notify(nameof(RunningInstanceRows));
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { return; }
         catch (DbException) { return; }
-
-        if (profile is null || revision != _avatarRevision || token.IsCancellationRequested)
-            return;
-
-        var avatar = await PlayerSkinAvatar.LoadAsync(profile, token);
-        if (revision == _avatarRevision && !token.IsCancellationRequested)
-            SetPlayerAvatar(avatar);
-        else
-            avatar?.Dispose();
+        finally
+        {
+            _avatarLoads.Remove(profileId);
+        }
     }
 
-    private void SetPlayerAvatar(Bitmap? avatar)
-    {
-        var previous = _playerAvatar;
-        _playerAvatar = avatar;
-        Notify(nameof(PlayerAvatar));
-        previous?.Dispose();
-    }
-
-    internal async Task LaunchGameAsync()
+    internal async Task<string?> LaunchGameAsync()
     {
         if (!CanLaunchGame || _selectedProfile is not { } profile || _selectedInstance is not { } instance)
-            return;
+            return null;
 
         _isLaunching = true;
-        LaunchError = null;
         _progress = new("正在准备启动");
         var attempt = ++_launchAttempt;
         NotifyLaunchState();
@@ -199,8 +213,8 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
             });
             var result = await _gameInstances.LaunchGameInstance(profile.Id, instance.Id,
                 _appLifetime.ApplicationStopping, progress);
-            if (result.Status != ServiceStatus.Success)
-                LaunchError = result.Message;
+            return result.Status == ServiceStatus.Success || _appLifetime.ApplicationStopping.IsCancellationRequested
+                ? null : result.Message ?? "无法启动游戏，请重试。";
         }
         finally
         {
@@ -220,57 +234,56 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
             text += $" · 已处理 {processed}/{progress.TotalFiles} 个文件";
 
         if (!string.IsNullOrWhiteSpace(progress.FileName))
-        {
-            var bytes = FormatBytes(progress.DownloadedBytes);
-            text += progress.FileBytes is { } total
-                ? $" · {progress.FileName} · {bytes} / {FormatBytes(total)}"
-                : $" · {progress.FileName} · {bytes}";
-        }
+            text += $" · {progress.FileName} · {DownloadQueueViewModel.FormatTransfer(progress.DownloadedBytes, progress.FileBytes)}";
 
         return text;
     }
-
-    private static string FormatBytes(long bytes) => bytes switch
-    {
-        >= 1024L * 1024 => $"{bytes / (1024d * 1024):0.0} MiB",
-        >= 1024 => $"{bytes / 1024d:0.0} KiB",
-        _ => $"{bytes} B"
-    };
 
     private void OnRunningInstancesChanged() => Dispatcher.UIThread.Post(RefreshRunningInstances);
 
     private void RefreshRunningInstances()
     {
+        if (_disposed)
+            return;
+
         RunningInstances = _gameInstances.GetRunningInstances();
         Notify(nameof(RunningInstances));
+        Notify(nameof(RunningInstanceRows));
         Notify(nameof(HasRunningInstances));
         NotifyLaunchState();
+        foreach (var profileId in RunningInstances.Select(instance => instance.ProfileId).Distinct())
+            _ = LoadPlayerAvatarAsync(profileId);
     }
 
     private void NotifyLaunchState()
     {
+        Notify(nameof(IsLaunching));
         Notify(nameof(CanLaunchGame));
         Notify(nameof(CanChangeLaunchSelection));
-        Notify(nameof(LaunchLabel));
-        Notify(nameof(LaunchError));
         NotifyLaunchStatus();
     }
 
     private void NotifyLaunchStatus()
     {
+        Notify(nameof(LaunchLabel));
+        Notify(nameof(LaunchDetail));
+        Notify(nameof(HasLaunchDetail));
         Notify(nameof(LaunchStatus));
-        Notify(nameof(HasLaunchStatus));
     }
 
     private void Notify(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
     public void Dispose()
     {
+        _disposed = true;
         _gameInstances.RunningInstancesChanged -= OnRunningInstancesChanged;
-        _avatarRevision++;
-        _playerAvatar?.Dispose();
+        foreach (var avatar in _playerAvatars.Values)
+            avatar.Dispose();
+        _playerAvatars.Clear();
     }
 
     private sealed record ProfileOption(Guid Id, string Name, string AuthenticationMethod, AuthMethod AuthMethod,
         Guid? AuthServerId);
 }
+
+public sealed record RunningInstanceRow(RunningGameInstance Instance, object PlayerAvatar);

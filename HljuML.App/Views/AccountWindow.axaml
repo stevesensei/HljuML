@@ -143,6 +143,7 @@
                                         <Border Classes="account-row">
                                             <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="{arc:ArcDesignTokenResource Space3}">
                                                 <arc:Avatar DisplayName="{Binding Name}" Source="{Binding Avatar}"
+                                                            CornerRadius="{arc:ArcDesignTokenResource RadiusStep8}"
                                                             Size="Large" VerticalAlignment="Center" />
                                                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
                                                     <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"

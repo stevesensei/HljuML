@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using ColorMC.Core.GuiHandle;
 using ColorMC.Core.Objs;
 using ColorMC.Core.Objs.Login;
@@ -30,52 +29,4 @@ internal sealed class GameLaunchReporter(IProgress<GameLaunchProgress> progress)
     public Task<bool> ServerPackUpgrade(string text) => Task.FromResult(true);
     public Task<bool> LoginFail(LoginObj obj) => Task.FromResult(false);
     public void NoJava(int version) => progress.Report(new($"正在查找 Java {version}"));
-
-    internal void AttachDownload(DownloadEventArgs args) => args.GuiHandle ??= new DownloadReporter(progress);
-
-    private sealed class DownloadReporter(IProgress<GameLaunchProgress> progress) : IDownloadGui
-    {
-        private readonly object _sync = new();
-        private int _total;
-        private int _processed;
-        private long _lastReport;
-
-        public void Update(int thread, bool state, int count) { }
-
-        public void UpdateTask(UpdateType type, int data)
-        {
-            lock (_sync)
-            {
-                if (type == UpdateType.AddItems)
-                {
-                    _total = data;
-                    Report();
-                }
-                else if (type == UpdateType.ItemDone)
-                {
-                    _processed += data;
-                    if (_processed == _total || CanReport())
-                        Report();
-                }
-            }
-        }
-
-        public void UpdateItem(int thread, FileItemObj item)
-        {
-            lock (_sync)
-            {
-                if (item.State == DownloadItemState.Download && CanReport())
-                    Report(item);
-            }
-        }
-
-        private bool CanReport() => Stopwatch.GetElapsedTime(_lastReport) >= TimeSpan.FromMilliseconds(150);
-
-        private void Report(FileItemObj? item = null)
-        {
-            _lastReport = Stopwatch.GetTimestamp();
-            progress.Report(new("正在下载", _processed, _total, item?.Name, item?.NowSize ?? 0,
-                item?.AllSize is > 0 ? item.AllSize : null));
-        }
-    }
 }

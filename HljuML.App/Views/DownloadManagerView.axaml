@@ -1,0 +1,96 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:arc="https://github.com/AIDotNet/TKCode.Arc"
+             xmlns:vm="using:HljuML.App.Core"
+             x:Class="HljuML.App.Views.DownloadManagerView"
+             x:DataType="vm:DownloadQueueViewModel">
+    <UserControl.Resources>
+        <Thickness x:Key="DownloadCardPadding">20</Thickness>
+        <Thickness x:Key="DownloadFilePadding">12</Thickness>
+    </UserControl.Resources>
+    <UserControl.Styles>
+        <Style Selector="TextBlock.download-heading">
+            <Setter Property="Foreground" Value="{arc:ArcDesignTokenResource Foreground}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="TextBlock.download-secondary">
+            <Setter Property="Foreground" Value="{arc:ArcDesignTokenResource TextSecondary}" />
+            <Setter Property="FontSize" Value="{arc:ArcDesignTokenResource TypeSM}" />
+        </Style>
+    </UserControl.Styles>
+
+    <StackPanel Spacing="{arc:ArcDesignTokenResource Space4}">
+        <StackPanel Spacing="{arc:ArcDesignTokenResource Space1}">
+            <TextBlock Classes="download-heading" Text="下载管理器"
+                       FontSize="{arc:ArcDesignTokenResource Type3XL}" />
+            <TextBlock Classes="download-secondary" Text="{Binding Summary}"
+                       IsVisible="{Binding HasActiveDownloads}" />
+        </StackPanel>
+
+        <Border Background="{arc:ArcDesignTokenResource Surface}"
+                BorderBrush="{arc:ArcDesignTokenResource Border}" BorderThickness="1"
+                CornerRadius="{arc:ArcDesignTokenResource RadiusPanel}"
+                IsVisible="{Binding !HasActiveDownloads}">
+            <arc:EmptyState Title="当前没有下载任务">
+                <arc:EmptyState.Icon>
+                    <arc:ArcGlyph Data="{x:Static arc:ArcIcons.Download}" Size="24" />
+                </arc:EmptyState.Icon>
+            </arc:EmptyState>
+        </Border>
+
+        <ItemsControl ItemsSource="{Binding Tasks}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel Spacing="{arc:ArcDesignTokenResource Space3}" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:DownloadTaskViewModel">
+                    <Border Background="{arc:ArcDesignTokenResource Surface}"
+                            BorderBrush="{arc:ArcDesignTokenResource Border}" BorderThickness="1"
+                            CornerRadius="{arc:ArcDesignTokenResource RadiusPanel}"
+                            Padding="{StaticResource DownloadCardPadding}">
+                        <StackPanel Spacing="{arc:ArcDesignTokenResource Space3}">
+                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="{arc:ArcDesignTokenResource Space3}">
+                                <arc:ArcGlyph Data="{x:Static arc:ArcIcons.Download}" Size="20"
+                                              Foreground="{arc:ArcDesignTokenResource Accent}" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Classes="download-heading"
+                                           FontSize="{arc:ArcDesignTokenResource TypeLG}"
+                                           Text="{Binding Name}" TextTrimming="CharacterEllipsis"
+                                           ToolTip.Tip="{Binding Name}" />
+                                <TextBlock Grid.Column="2" Classes="download-secondary"
+                                           Text="{Binding Status}" VerticalAlignment="Center" />
+                            </Grid>
+                            <arc:Progress Label="{Binding ProgressLabel}" Maximum="100"
+                                          Value="{Binding ProgressValue, Mode=OneWay}" IsValueVisible="True"
+                                          IsVisible="{Binding HasProgress}" />
+                            <TextBlock Classes="download-secondary" Text="{Binding Summary}" TextWrapping="Wrap" />
+
+                            <ItemsControl ItemsSource="{Binding Files}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Spacing="{arc:ArcDesignTokenResource Space2}" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:DownloadFileRow">
+                                        <Border Background="{arc:ArcDesignTokenResource SurfaceMuted}"
+                                                CornerRadius="{arc:ArcDesignTokenResource RadiusControl}"
+                                                Padding="{StaticResource DownloadFilePadding}">
+                                            <StackPanel Spacing="{arc:ArcDesignTokenResource Space1}">
+                                                <TextBlock Classes="download-heading" Text="{Binding Name}"
+                                                           TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" />
+                                                <TextBlock Classes="download-secondary" Text="{Binding Summary}"
+                                                           TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </StackPanel>
+</UserControl>

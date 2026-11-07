@@ -1,5 +1,6 @@
 ﻿using HljuML.Core.GamePlay;
 using HljuML.Core.Infrastructure.Storage;
+using HljuML.Core.Infrastructure.Downloads;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,6 +24,8 @@ public static class ServiceCollectionExtensions
         collection.AddSingleton<JavaEnvService>();
         collection.AddSingleton<GameInstanceService>();
         collection.AddHostedService(services => services.GetRequiredService<GameInstanceService>());
+        collection.AddSingleton<DownloadManagementService>();
+        collection.AddHostedService(services => services.GetRequiredService<DownloadManagementService>());
         collection.AddSingleton<MainViewModel>();
         collection.AddSingleton(services => new MainWindow(services.GetRequiredService<IServiceScopeFactory>())
         {

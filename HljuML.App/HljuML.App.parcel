@@ -1,0 +1,33 @@
+{
+    "GeneralSettings": {
+        "NetProjectPath": "HljuML.App.csproj",
+        "PackageName": {
+            "$type": "msbuild",
+            "property": "AssemblyName"
+        },
+        "AssemblyName": {
+            "$type": "msbuild",
+            "property": "AssemblyName"
+        },
+        "ApplicationName": "HljuML.App",
+        "Version": "1.0.0",
+        "Icon": "C:/Users/wxtal/Downloads/instance_icon_default.jpg",
+        "Company": "TimeShift co."
+    },
+    "LinuxSettings": {
+        "CreateBinSymlink": "True"
+    },
+    "Win32Settings": {
+        "InstallerIcon": "C:/Users/wxtal/Downloads/instance_icon_default.jpg",
+        "IncludeUninstaller": "True"
+    },
+    "MacOsSettings": {
+        "CreateBundle": true,
+        "BundleIdentifier": "com.CompanyName.HljuML-App",
+        "SigningCredentialsType": "AdHoc"
+    },
+    "PublishSettings": {
+        "PublishSingleFile": "True",
+        "ExtraBuildProperties": {}
+    }
+}
