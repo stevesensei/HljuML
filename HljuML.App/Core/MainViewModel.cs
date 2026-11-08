@@ -210,7 +210,7 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
         }
     }
 
-    internal async Task<string?> LaunchGameAsync()
+    internal async Task<string?> LaunchGameAsync(Func<Guid, Task<bool>>? reauthenticate = null)
     {
         if (!CanLaunchGame || _selectedProfile is not { } profile || _selectedInstance is not { } instance)
             return null;
@@ -232,6 +232,19 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
             });
             var result = await _gameInstances.LaunchGameInstance(profile.Id, instance.Id,
                 _appLifetime.ApplicationStopping, progress);
+            // 一次用户启动最多恢复一次；仅明确的会话失效触发登录，网络错误不弹密码框。
+            if (result.ErrorCode == ServiceErrorCode.AuthenticationRequired && profile.AuthMethod == AuthMethod.Custom
+                && reauthenticate is not null && !_appLifetime.ApplicationStopping.IsCancellationRequested)
+            {
+                _progress = new("请重新登录玩家档案");
+                NotifyLaunchStatus();
+                if (!await reauthenticate(profile.Id)) return null;
+                _installedRefreshPending = true;
+                _progress = new("登录成功，正在继续启动");
+                NotifyLaunchStatus();
+                result = await _gameInstances.LaunchGameInstance(profile.Id, instance.Id,
+                    _appLifetime.ApplicationStopping, progress);
+            }
             return result.Status == ServiceStatus.Success || _appLifetime.ApplicationStopping.IsCancellationRequested
                 ? null : result.Message ?? "无法启动游戏，请重试。";
         }

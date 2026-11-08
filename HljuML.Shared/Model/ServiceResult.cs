@@ -8,11 +8,19 @@ public enum ServiceStatus
     InternalError = 2
 }
 
+/// <summary>供调用方决定恢复流程的错误类型，不依赖界面文案判断。</summary>
+public enum ServiceErrorCode
+{
+    None = 0,
+    AuthenticationRequired = 1
+}
+
 public sealed class ServiceResult<TDataType>
 {
     public ServiceStatus Status { get; set; }
     public string Message { get; set; } = null!;
     public TDataType? Data { get; set; }
+    public ServiceErrorCode ErrorCode { get; set; }
     
     public static ServiceResult<TDataType> SuccessResult(TDataType? data = default, string message = "Success")
     {
@@ -24,11 +32,13 @@ public sealed class ServiceResult<TDataType>
         };
     }
 
-    public static ServiceResult<TDataType> FailureResult(TDataType? data = default, string message = "Failure")
+    public static ServiceResult<TDataType> FailureResult(TDataType? data = default, string message = "Failure",
+        ServiceErrorCode errorCode = ServiceErrorCode.None)
     {
         return new ServiceResult<TDataType>
         {
             Status = ServiceStatus.Failure,
+            ErrorCode = errorCode,
             Message = message,
             Data = data
         };

@@ -122,7 +122,7 @@ public sealed class GameInstanceService(IServiceScopeFactory scopeFactory, JavaE
                 progress?.Report(new("正在刷新外置登录"));
             var loginResult = await profiles.GetLaunchLogin(profile, stoppingToken);
             if (loginResult.Data is not { } login)
-                return ServiceResult<int?>.FailureResult(message: loginResult.Message);
+                return ServiceResult<int?>.FailureResult(message: loginResult.Message, errorCode: loginResult.ErrorCode);
 
             var gameResult = await ResolveGame(instanceData, progress, stoppingToken);
             if (gameResult.Data is not { } game)
@@ -156,7 +156,9 @@ public sealed class GameInstanceService(IServiceScopeFactory scopeFactory, JavaE
                 game = game with { JvmLocal = JavaExecutablePreference.PreferWindowed(javaPath) };
 
             var reporter = progress is null ? null : new GameLaunchReporter(progress);
-            var args = new GameLaunchArg { Auth = login, Gui = reporter };
+            // 外置会话已经由应用刷新并持久化，核心只复用；微软会话仍沿用核心的刷新流程。
+            var args = new GameLaunchArg { Auth = login, Gui = reporter,
+                AuthAlreadyRefreshed = profile.AuthMethod == AuthMethod.Custom };
             var trackRefresh = profile.AuthMethod != AuthMethod.Offline;
             var refreshed = false;
             void OnGameLog(GameLogEventArgs evt)
@@ -354,6 +356,7 @@ public sealed class GameInstanceService(IServiceScopeFactory scopeFactory, JavaE
         ColorMCCore.Init(new()
         {
             Local = LauncherPaths.ColorMcDirectory,
+            UseAuthDatabase = false,
             CurseForgeKey = "$2a$10$ZEIKK/IxI6VA.RujTLD8vu3YwTVM/Syq6tvaImx1X4U773QzWDGMO"
         });
         

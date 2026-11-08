@@ -5,6 +5,7 @@ using System.ComponentModel;
 using System.Data.Common;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
@@ -39,6 +40,8 @@ public partial class AccountWindow : Window
     private ResolvedYggdrasilServer? _preview;
     private CustomAuthServer? _loginServer;
     private CustomAuthServer? _addedServer;
+    private Guid? _reloginProfileId;
+    private readonly Guid? _requestedReloginId;
     private Uri? _homepage;
     private FormStep _step;
 
@@ -53,7 +56,10 @@ public partial class AccountWindow : Window
         DataContext = this;
     }
 
-    internal AccountWindow(IServiceScopeFactory scopes) : this() => _scopes = scopes;
+    internal AccountWindow(IServiceScopeFactory scopes, Guid? reloginProfileId = null) : this()
+    { _scopes = scopes; _requestedReloginId = reloginProfileId; }
+
+    internal Guid? ReauthenticatedProfileId { get; private set; }
 
     protected override async void OnOpened(EventArgs e)
     {
@@ -76,6 +82,14 @@ public partial class AccountWindow : Window
 
             AccountStatus.IsVisible = false;
             EmptyProfiles.IsVisible = Profiles.Count == 0;
+            // 启动恢复只打开原档案的登录表单，不要求用户再次定位账号。
+            if (_requestedReloginId is { } requested)
+            {
+                var row = Profiles.FirstOrDefault(item => item.Id == requested);
+                var server = AuthServers.FirstOrDefault(item => item.Server.Id == row?.AuthServerId)?.Server;
+                if (row is not null && server is not null) OpenLogin(server, row);
+                else ShowAccountError("需要重新登录的档案或认证服务器已被删除，请关闭窗口重新选择。");
+            }
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch (DbException)
@@ -122,7 +136,7 @@ public partial class AccountWindow : Window
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
-        if (e.Key == Key.Escape && !e.Handled && !AccountForm.IsOpen)
+        if (e.Key == Key.Escape && !e.Handled && !AccountForm.IsOpen && !_managingAccount)
         {
             e.Handled = true;
             Close();
@@ -133,42 +147,49 @@ public partial class AccountWindow : Window
 
     private void OnUseProfileClicked(object? sender, RoutedEventArgs e)
     {
+        if (_managingAccount || _requestedReloginId is not null) return;
         if (sender is Control { DataContext: AccountProfileRow profile })
             Close(profile.Id);
     }
 
     private void OnAddServerClicked(object? sender, RoutedEventArgs e)
     {
+        if (_managingAccount) return;
         ServerAddress.Text = string.Empty;
         OpenForm(FormStep.Address);
     }
 
     private void OnOfflineClicked(object? sender, RoutedEventArgs e)
     {
+        if (_managingAccount) return;
         OfflineName.Text = string.Empty;
         OpenForm(FormStep.Offline);
     }
 
     private void OnServerClicked(object? sender, RoutedEventArgs e)
     {
+        if (_managingAccount) return;
         if (sender is Control { DataContext: AccountServerRow row })
             OpenLogin(row.Server);
     }
 
     private void OnAddedServerClicked(object? sender, RoutedEventArgs e)
     {
+        if (_managingAccount) return;
         if (_addedServer is { } server)
             OpenLogin(server);
     }
 
-    private void OpenLogin(CustomAuthServer server)
+    /// <summary>添加和重新登录共用表单；重新登录只更新既有档案，不再创建重复档案。</summary>
+    private void OpenLogin(CustomAuthServer server, AccountProfileRow? profile = null)
     {
         _loginServer = server;
+        _reloginProfileId = profile?.Id;
         _homepage = null;
         LoginServerName.Text = server.Name;
         HomepageLink.IsVisible = false;
         RegistrationLink.IsVisible = !string.IsNullOrWhiteSpace(server.RegisterAddress);
-        LoginAccount.Text = string.Empty;
+        LoginAccount.Text = profile?.Account ?? string.Empty;
         LoginPassword.Text = string.Empty;
         LoginPassword.IsRevealed = false;
         OpenForm(FormStep.Login);
@@ -193,11 +214,15 @@ public partial class AccountWindow : Window
         BackButton.IsVisible = step == FormStep.Preview;
         AccountForm.Title = step switch
         {
-            FormStep.Login => "添加外置登录账户",
+            FormStep.Login => _reloginProfileId is null ? "添加外置登录账户" : "重新登录玩家档案",
             FormStep.Offline => "添加离线账户",
             FormStep.Role => "选择游戏角色",
             _ => "添加认证服务器"
         };
+        AccountForm.Description = _reloginProfileId is not null && step is FormStep.Login or FormStep.Role
+            ? _requestedReloginId is not null
+                ? "会话已失效。登录成功后继续本次启动，密码仅用于本次登录。"
+                : "重新认证后更新此档案，保留实例关联。密码仅用于本次登录。" : null;
         ConfirmButton.Content = step switch
         {
             FormStep.Address => "下一步",
@@ -243,9 +268,11 @@ public partial class AccountWindow : Window
         _roleSelection = null;
         _preview = null;
         _loginServer = null;
+        _reloginProfileId = null;
         LoginPassword.Text = string.Empty;
         RoleList.ItemsSource = null;
         UpdateBusyState();
+        if (_requestedReloginId is not null && ReauthenticatedProfileId is null) Close();
     }
 
     private async void OnConfirmClicked(object? sender, RoutedEventArgs e)
@@ -364,7 +391,9 @@ public partial class AccountWindow : Window
                 return;
 
             var selector = new RoleSelector(roles => ChooseRole(roles, token));
-            result = await service.CreateCustomPlayerProfile(_loginServer.Id, account, password, selector, token);
+            result = _reloginProfileId is { } profileId
+                ? await service.CustomServerLogin(profileId, account, password, selector, token)
+                : await service.CreateCustomPlayerProfile(_loginServer.Id, account, password, selector, token);
         }
 
         token.ThrowIfCancellationRequested();
@@ -376,6 +405,13 @@ public partial class AccountWindow : Window
 
         AddProfileRow(profile, _lifetime.Token);
         EmptyProfiles.IsVisible = false;
+        if (_requestedReloginId == profile.Id)
+        {
+            ReauthenticatedProfileId = profile.Id;
+            LoginPassword.Text = string.Empty;
+            Close(profile.Id);
+            return;
+        }
         AccountForm.Close(null);
     }
 
@@ -450,8 +486,11 @@ public partial class AccountWindow : Window
             _ => "离线模式"
         };
         var details = string.IsNullOrWhiteSpace(profile.PlayerEmail) ? provider : $"{provider} · {profile.PlayerEmail}";
-        var row = new AccountProfileRow(profile.Id, profile.PlayerName, details, _defaultAvatar);
-        Profiles.Add(row);
+        var row = new AccountProfileRow(profile.Id, profile.PlayerName, details, _defaultAvatar,
+            profile.AuthServerId, profile.PlayerEmail);
+        var previous = Profiles.FirstOrDefault(item => item.Id == profile.Id);
+        if (previous is null) Profiles.Add(row);
+        else Profiles[Profiles.IndexOf(previous)] = row;
         if (profile.AuthMethod == AuthMethod.Custom)
             _ = LoadAvatar(profile, row, token);
     }
@@ -490,7 +529,11 @@ public partial class AccountWindow : Window
     }
 }
 
-public sealed record AccountProfileRow(Guid Id, string Name, string Details, Bitmap Avatar);
+public sealed record AccountProfileRow(Guid Id, string Name, string Details, Bitmap Avatar,
+    Guid? AuthServerId = null, string? Account = null)
+{
+    public bool CanRelogin => AuthServerId is not null;
+}
 
 public sealed record AccountServerRow(CustomAuthServer Server)
 {

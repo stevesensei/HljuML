@@ -44,5 +44,8 @@
       <Compile Update="Views\GameDownloadView.axaml.cs">
         <DependentUpon>GameDownloadView.axaml</DependentUpon>
       </Compile>
+      <Compile Update="Views\AccountWindow.Management.cs">
+        <DependentUpon>AccountWindow.axaml</DependentUpon>
+      </Compile>
     </ItemGroup>
 </Project>

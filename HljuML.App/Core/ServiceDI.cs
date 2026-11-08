@@ -18,6 +18,7 @@ public static class ServiceCollectionExtensions
         }.ToString();
         collection.AddDbContext<HljuMLDbContext>(options => options.UseSqlite(connectionString));
         collection.AddScoped<AuthServerService>();
+        collection.AddSingleton<LegacyFrameworkAccountCache>();
         collection.AddScoped<PlayerProfileService>();
         collection.AddHostedService<SqliteDatabaseInitializer>();
 

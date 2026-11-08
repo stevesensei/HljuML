@@ -228,8 +228,21 @@ public partial class MainWindow : Window
 
     private async void OnLaunchClicked(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is MainViewModel viewModel && await viewModel.LaunchGameAsync() is { } error && IsVisible)
+        if (DataContext is MainViewModel viewModel && await viewModel.LaunchGameAsync(ReauthenticateProfileAsync) is { } error && IsVisible)
             Toast.Show(this, "启动失败", ToastKind.Error, error);
+    }
+
+    /// <summary>只恢复原启动选中的档案；用户关闭窗口时取消恢复，不切换账号或离线启动。</summary>
+    private async Task<bool> ReauthenticateProfileAsync(Guid profileId)
+    {
+        if (_closed || !IsVisible || _scopes is null) return false;
+        var accounts = new AccountWindow(_scopes, profileId)
+        {
+            Width = Math.Clamp(Bounds.Width - 32, 540, 860),
+            Height = Math.Clamp(Bounds.Height - 32, 420, 552)
+        };
+        var selected = await ShowSelectionDialog<Guid?>(accounts);
+        return selected == profileId && accounts.ReauthenticatedProfileId == profileId;
     }
 
     private void OnStopInstanceClicked(object? sender, RoutedEventArgs e)

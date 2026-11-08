@@ -92,6 +92,7 @@
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="local:AccountServerRow">
+                                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{arc:ArcDesignTokenResource Space1}">
                                         <Button Classes="account-provider" Click="OnServerClicked"
                                                 AutomationProperties.Name="{Binding Server.Name}">
                                             <ToolTip.Tip>
@@ -108,6 +109,12 @@
                                                 </StackPanel>
                                             </Grid>
                                         </Button>
+                                        <arc:Button Grid.Column="1" Variant="Danger" Size="Small" VerticalAlignment="Center"
+                                                    Click="OnDeleteServerClicked" ToolTip.Tip="删除认证服务器"
+                                                    AutomationProperties.Name="{Binding Server.Name, StringFormat='删除认证服务器 {0}'}">
+                                            <arc:ArcGlyph Size="16" Data="M3,6 H21 M9,6 V3 H15 V6 M5,6 L6,21 H18 L19,6 M10,10 V17 M14,10 V17" />
+                                        </arc:Button>
+                                      </Grid>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
@@ -151,9 +158,15 @@
                                                     <TextBlock Classes="account-secondary" Text="{Binding Details}" TextTrimming="CharacterEllipsis"
                                                                ToolTip.Tip="{Binding Details}" />
                                                 </StackPanel>
-                                                <arc:Button Grid.Column="2" Content="使用" Variant="Secondary" Size="Small"
-                                                            VerticalAlignment="Center" Click="OnUseProfileClicked"
-                                                            AutomationProperties.Name="{Binding Name, StringFormat='使用 {0}'}" />
+                                                <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="{arc:ArcDesignTokenResource Space1}">
+                                                    <arc:Button Content="使用" Variant="Secondary" Size="Small" Click="OnUseProfileClicked"
+                                                                AutomationProperties.Name="{Binding Name, StringFormat='使用 {0}'}" />
+                                                    <arc:Button Content="重新登录" Variant="Ghost" Size="Small" IsVisible="{Binding CanRelogin}"
+                                                                Click="OnReloginProfileClicked"
+                                                                AutomationProperties.Name="{Binding Name, StringFormat='重新登录 {0}'}" />
+                                                    <arc:Button Content="删除" Variant="Danger" Size="Small" Click="OnDeleteProfileClicked"
+                                                                AutomationProperties.Name="{Binding Name, StringFormat='删除玩家档案 {0}'}" />
+                                                </StackPanel>
                                             </Grid>
                                         </Border>
                                     </DataTemplate>

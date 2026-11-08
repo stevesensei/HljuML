@@ -12,10 +12,12 @@ using HljuML.Core.Infrastructure.Storage;
 using HljuML.Core.Model.Entity;
 using HljuML.Shared.Model;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace HljuML.Core.GamePlay.Auth;
 
-public class PlayerProfileService(HljuMLDbContext db, AuthServerService authServers)
+public class PlayerProfileService(HljuMLDbContext db, AuthServerService authServers,
+    LegacyFrameworkAccountCache legacyCache, OperationCoordinatorService operations, ILogger<PlayerProfileService> logger)
 {
     /// <summary>
     /// 获取全部Profile
@@ -139,11 +141,14 @@ public class PlayerProfileService(HljuMLDbContext db, AuthServerService authServ
 
         var cached = ReadLoginCache(profile);
         if (cached is null || !IsValidLaunchLogin(profile, cached))
-            return ServiceResult<LoginObj>.FailureResult(message: "玩家档案缺少有效的登录信息，请重新登录。");
+            return ServiceResult<LoginObj>.FailureResult(message: "玩家档案缺少有效的登录信息，请重新登录。",
+                errorCode: ServiceErrorCode.AuthenticationRequired);
 
         if (profile.AuthMethod != AuthMethod.Custom)
             return ServiceResult<LoginObj>.SuccessResult(cached);
 
+        await legacyCache.RemoveAsync(cached, cancellationToken);
+        logger.LogInformation("正在刷新外置会话，档案 {ProfileId}", profile.Id);
         var refreshed = await RefreshCustomLogin(cached, cancellationToken);
         if (refreshed.Data is not { } login)
             return refreshed;
@@ -202,10 +207,15 @@ public class PlayerProfileService(HljuMLDbContext db, AuthServerService authServ
     public async Task<ServiceResult<PlayerProfile>> DeletePlayerProfile(
         Guid playerProfileId, CancellationToken cancellationToken = default)
     {
+        // 与游戏启动串行，防止删除后仍有本进程正在刷新并重新保存该档案。
+        using var operation = await operations.EnterAsync(cancellationToken);
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var result = await GetPlayerProfile(playerProfileId, cancellationToken);
         if (result.Data is null)
             return result;
+
+        if (!await legacyCache.RemoveAsync(ReadLoginCache(result.Data), cancellationToken))
+            return ServiceResult<PlayerProfile>.FailureResult(message: "无法清理旧认证缓存，未删除档案。请关闭占用 ColorMC 缓存的程序后重试。");
 
         await db.GameInstances.Where(instance => instance.LastUsedPlayerId == playerProfileId)
             .ExecuteUpdateAsync(setters => setters.SetProperty(instance => instance.LastUsedPlayerId, (Guid?)null),
@@ -320,6 +330,7 @@ public class PlayerProfileService(HljuMLDbContext db, AuthServerService authServ
         Guid playerProfileId, CancellationToken cancellationToken,
         (string Account, string Password, ILoginGui Selector)? credentials = null)
     {
+        using var operation = await operations.EnterAsync(cancellationToken);
         var result = await GetPlayerProfile(playerProfileId, cancellationToken);
         if (result.Data is not { } profile)
             return result;
@@ -328,6 +339,10 @@ public class PlayerProfileService(HljuMLDbContext db, AuthServerService authServ
         var serverUrl = AuthServerService.NormalizeServerAddress(address);
         if (profile.AuthMethod != AuthMethod.Custom || serverUrl is null)
             return ServiceResult<PlayerProfile>.FailureResult(message: "请为该档案配置有效的自定义认证服务器地址。");
+
+        // 在更换客户端会话前清理能够证明归属的旧副本，随后只保存应用自己的账户数据库。
+        if (!await legacyCache.RemoveAsync(ReadLoginCache(profile), cancellationToken))
+            return ServiceResult<PlayerProfile>.FailureResult(message: "无法清理旧认证缓存，请关闭占用缓存的程序后重试登录。");
 
         ServiceResult<LoginObj> loginResult;
         if (credentials is { } input)
@@ -345,14 +360,16 @@ public class PlayerProfileService(HljuMLDbContext db, AuthServerService authServ
         }
 
         if (loginResult.Data is not { } login)
-            return ServiceResult<PlayerProfile>.FailureResult(message: loginResult.Message);
+            return ServiceResult<PlayerProfile>.FailureResult(message: loginResult.Message, errorCode: loginResult.ErrorCode);
 
-        return await SaveRefreshedLogin(profile, login, cancellationToken)
-            ? ServiceResult<PlayerProfile>.SuccessResult(profile)
-            : ServiceResult<PlayerProfile>.FailureResult(message: "玩家档案已变更，请重新登录。");
+        // 服务器成功刷新后旧令牌可能已撤销，关闭登录窗口也必须先持久化新令牌。
+        if (!await SaveRefreshedLogin(profile, login, CancellationToken.None))
+            return ServiceResult<PlayerProfile>.FailureResult(message: "玩家档案已变更，请重新登录。");
+        cancellationToken.ThrowIfCancellationRequested();
+        return ServiceResult<PlayerProfile>.SuccessResult(profile);
     }
 
-    private static Task<ServiceResult<LoginObj>> RefreshCustomLogin(LoginObj login, CancellationToken cancellationToken) =>
+    private Task<ServiceResult<LoginObj>> RefreshCustomLogin(LoginObj login, CancellationToken cancellationToken) =>
         AuthenticateCustom(login.Text1, async () =>
         {
             var refreshed = await AuthlibInjector.RefreshAsync(login, cancellationToken);
@@ -388,7 +405,7 @@ public class PlayerProfileService(HljuMLDbContext db, AuthServerService authServ
         return true;
     }
 
-    private static async Task<ServiceResult<LoginObj>> AuthenticateCustom(
+    private async Task<ServiceResult<LoginObj>> AuthenticateCustom(
         string serverUrl, Func<Task<LoginObj>> authenticate, CancellationToken cancellationToken)
     {
         try
@@ -400,15 +417,19 @@ public class PlayerProfileService(HljuMLDbContext db, AuthServerService authServ
         }
         catch (LoginException ex) when (ex.Fail == LoginFailState.LoginTokenTimeout)
         {
-            return ServiceResult<LoginObj>.FailureResult(message: "登录已失效，请使用账号和密码重新登录。");
+            logger.LogInformation("外置会话已失效，需要重新认证");
+            return ServiceResult<LoginObj>.FailureResult(message: "登录已失效，请使用账号和密码重新登录。",
+                errorCode: ServiceErrorCode.AuthenticationRequired);
         }
-        catch (LoginException)
+        catch (LoginException error)
         {
+            logger.LogWarning("外置认证失败，阶段 {Stage}，原因 {Reason}", error.State, error.Fail);
             return ServiceResult<LoginObj>.FailureResult(message: "认证服务器登录失败，请检查账号、密码或所选角色。");
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException or JsonException ||
             ex is OperationCanceledException && !cancellationToken.IsCancellationRequested)
         {
+            logger.LogWarning("外置认证响应异常，错误类型 {ErrorType}", ex.GetType().Name);
             return ServiceResult<LoginObj>.FailureResult(message: "无法获取有效的认证服务器响应，请稍后重试。");
         }
     }
