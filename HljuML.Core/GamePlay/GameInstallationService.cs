@@ -15,7 +15,7 @@ public sealed record GameInstallationRequest(string Name, string Version,
     Loaders Loader = Loaders.Normal, string? LoaderVersion = null);
 
 public sealed partial class GameInstallationService(IServiceScopeFactory scopeFactory,
-    DownloadManagementService downloads, ColorMcOperationCoordinator coordinator,
+    DownloadManagementService downloads, OperationCoordinatorService coordinatorService,
     ILogger<GameInstallationService> logger) : BackgroundService
 {
     private readonly SemaphoreSlim _enqueueGate = new(1, 1);
@@ -25,7 +25,7 @@ public sealed partial class GameInstallationService(IServiceScopeFactory scopeFa
 
     public override async Task StartAsync(CancellationToken cancellationToken)
     {
-        using (await coordinator.EnterAsync(cancellationToken))
+        using (await coordinatorService.EnterAsync(cancellationToken))
             await RecoverAsync(cancellationToken);
         await base.StartAsync(cancellationToken);
     }
@@ -60,7 +60,7 @@ public sealed partial class GameInstallationService(IServiceScopeFactory scopeFa
             return ServiceResult<Guid>.FailureResult(message: "加载器版本包含无效字符。");
 
         request = request with { Name = request.Name.Trim() };
-        using var operation = await coordinator.EnterAsync(cancellationToken);
+        using var operation = await coordinatorService.EnterAsync(cancellationToken);
         await _enqueueGate.WaitAsync(cancellationToken);
         try
         {
@@ -90,7 +90,7 @@ public sealed partial class GameInstallationService(IServiceScopeFactory scopeFa
                 var token = cancellation.Token;
                 try
                 {
-                    using (await coordinator.EnterAsync(token))
+                    using (await coordinatorService.EnterAsync(token))
                     {
                         await downloads.TrackOperationAsync(installation.OperationId, async () =>
                         {
@@ -152,7 +152,7 @@ public sealed partial class GameInstallationService(IServiceScopeFactory scopeFa
             && string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase)))
             return true;
         return Directory.Exists(LauncherPaths.DefaultInstanceDirectory)
-            && ColorMcInstanceFolder.ReadInstances(LauncherPaths.DefaultInstanceDirectory, token)
+            && InstanceFolderService.ReadInstances(LauncherPaths.DefaultInstanceDirectory, token)
                 .Any(game => string.Equals(game.Name, name, StringComparison.OrdinalIgnoreCase));
     }
 

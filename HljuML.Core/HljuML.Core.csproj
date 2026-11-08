@@ -36,6 +36,9 @@
       <Compile Update="GamePlay\ModpackImportService.Files.cs">
         <DependentUpon>ModpackImportService.cs</DependentUpon>
       </Compile>
+      <Compile Update="GamePlay\JavaRuntimeService.Install.cs">
+        <DependentUpon>JavaRuntimeService.cs</DependentUpon>
+      </Compile>
     </ItemGroup>
 
 </Project>

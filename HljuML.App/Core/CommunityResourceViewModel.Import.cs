@@ -9,13 +9,12 @@ namespace HljuML.App.Core;
 
 public sealed partial class CommunityResourceViewModel
 {
-    private readonly ModpackImportService _imports;
     public bool IsImporting { get; private set; }
     public string? ImportError { get; private set; }
     public bool HasImportError => ImportError is not null;
 
     /// <summary>选择本地整合包并提交安装队列；任务创建事件会打开已有下载管理器。</summary>
-    public async Task ImportModpackAsync(Func<Task<string?>> chooseFile)
+    public async Task ImportModpackAsync(Func<Task<string?>> chooseFile, Func<string, Task> confirm)
     {
         if (_disposed || IsImporting) return;
         IsImporting = true;
@@ -25,8 +24,7 @@ public sealed partial class CommunityResourceViewModel
         {
             var file = await chooseFile();
             if (file is null || _disposed) return;
-            var result = await _imports.EnqueueAsync(file, cancellationToken: _stopping);
-            if (!_disposed && result.Status != ServiceStatus.Success) ImportError = result.Message;
+            await confirm(file);
         }
         catch (OperationCanceledException) when (_stopping.IsCancellationRequested) { }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException

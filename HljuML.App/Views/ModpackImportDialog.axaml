@@ -1,0 +1,42 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:arc="https://github.com/AIDotNet/TKCode.Arc"
+             xmlns:vm="using:HljuML.App.Core"
+             x:Class="HljuML.App.Views.ModpackImportDialog"
+             x:DataType="vm:ModpackImportViewModel">
+    <arc:Dialog Title="导入整合包" Description="确认实例名称与 Java 环境后开始安装。"
+                IsOpen="{Binding IsOpen, Mode=TwoWay}" Size="Large"
+                CloseButtonName="取消导入" CloseOnOutsidePress="False"
+                ShowCloseButton="{Binding CanDismiss}" CloseOnEscape="{Binding CanDismiss}">
+        <StackPanel Spacing="{arc:ArcDesignTokenResource Space4}">
+            <TextBlock Text="{Binding PackDescription}" TextWrapping="Wrap"
+                       Foreground="{arc:ArcDesignTokenResource Foreground}" />
+            <arc:Skeleton Lines="2" Label="正在解析整合包和 Java 要求" IsVisible="{Binding IsLoading}" />
+            <arc:Input Label="实例名称" Description="名称需在默认实例目录中唯一，最多 128 个字符。"
+                       Text="{Binding InstanceName, Mode=TwoWay}" ErrorMessage="{Binding NameError}"
+                       IsVisible="{Binding HasPack}" IsEnabled="{Binding CanDismiss}" />
+            <StackPanel IsVisible="{Binding HasPack}" Spacing="{arc:ArcDesignTokenResource Space2}">
+                <TextBlock Text="Java 环境" Foreground="{arc:ArcDesignTokenResource Foreground}" />
+                <TextBlock Text="{Binding JavaStatus}" TextWrapping="Wrap"
+                           Foreground="{arc:ArcDesignTokenResource TextSecondary}"
+                           AutomationProperties.LiveSetting="Polite" />
+                <arc:Checkbox Content="{Binding DownloadJavaLabel}" IsChecked="{Binding DownloadJava, Mode=TwoWay}"
+                              Description="复用相同主版本的 Java，缺失时下载适合当前系统和架构的 JDK，不修改全局默认设置。"
+                              IsVisible="{Binding HasJavaRequirement}" IsEnabled="{Binding CanConfirm}" />
+                <TextBlock Text="安装到默认实例目录" Foreground="{arc:ArcDesignTokenResource Foreground}" />
+                <TextBlock Text="{Binding Destination}" TextWrapping="Wrap"
+                           Foreground="{arc:ArcDesignTokenResource TextSecondary}" />
+            </StackPanel>
+            <arc:Alert Title="无法准备导入" Content="{Binding Error}" IsVisible="{Binding HasError}" Tone="Danger" />
+        </StackPanel>
+        <arc:Dialog.Actions>
+            <StackPanel Orientation="Horizontal" Spacing="{arc:ArcDesignTokenResource Space2}">
+                <arc:Button Content="重新解析" Variant="Secondary" IsVisible="{Binding CanRetry}" Click="OnRetryClicked" />
+                <arc:Button Content="取消" Variant="Secondary" IsEnabled="{Binding CanDismiss}" Click="OnCancelClicked" />
+                <arc:Button Variant="Primary" IsLoading="{Binding IsSubmitting}" IsEnabled="{Binding CanConfirm}" Click="OnConfirmClicked">
+                    <TextBlock Text="开始导入" Foreground="{arc:ArcDesignTokenResource Background}" />
+                </arc:Button>
+            </StackPanel>
+        </arc:Dialog.Actions>
+    </arc:Dialog>
+</UserControl>

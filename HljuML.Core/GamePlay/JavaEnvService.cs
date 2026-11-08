@@ -50,7 +50,7 @@ public sealed partial class JavaEnvService : BackgroundService
 
     public string DefaultJavaPath
     {
-        get { lock (_sync) return _defaultJavaPath; }
+        get { lock (_sync) return JavaExecutablePreference.PreferWindowed(_defaultJavaPath); }
     }
 
     public bool IsScanning
@@ -97,18 +97,20 @@ public sealed partial class JavaEnvService : BackgroundService
             List<string> paths;
             lock (_sync) paths = [_defaultJavaPath, .. _manualJavaPaths];
             if (Environment.GetEnvironmentVariable("JAVA_HOME") is { Length: > 0 } javaHome)
-                paths.Add(Path.Combine(javaHome, "bin", OperatingSystem.IsWindows() ? "javaw.exe" : "java"));
+                paths.Add(JavaExecutablePreference.PreferWindowed(
+                    Path.Combine(javaHome, "bin", OperatingSystem.IsWindows() ? "java.exe" : "java")));
             if (Directory.Exists(JvmPath.JavaDir))
                 found.AddRange(await Task.Run(() => JavaHelper.FindJava(JvmPath.JavaDir) ?? []));
 
             foreach (var path in paths.Where(File.Exists))
             {
-                if (await Task.Run(() => JavaHelper.GetJavaInfo(path)) is { } java)
+                if (await Task.Run(() => JavaHelper.GetJavaInfo(JavaExecutablePreference.PreferWindowed(path))) is { } java)
                     found.Add(java);
             }
 
             var comparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
             var environments = found.Where(java => File.Exists(java.Path))
+                .Select(java => java with { Path = JavaExecutablePreference.PreferWindowed(java.Path) })
                 .DistinctBy(java => Path.GetFullPath(java.Path), comparer)
                 .OrderByDescending(java => java.MajorVersion)
                 .ThenBy(java => java.Version).ThenBy(java => java.Path, comparer).ToArray();
@@ -116,6 +118,7 @@ public sealed partial class JavaEnvService : BackgroundService
             {
                 _environments = environments.Concat(_environments.Where(java => _manualJavaPaths.Contains(java.Path, comparer)))
                     .Where(java => File.Exists(java.Path))
+                    .Select(java => java with { Path = JavaExecutablePreference.PreferWindowed(java.Path) })
                     .DistinctBy(java => Path.GetFullPath(java.Path), comparer)
                     .OrderByDescending(java => java.MajorVersion).ThenBy(java => java.Version)
                     .ThenBy(java => java.Path, comparer).ToArray();
@@ -138,6 +141,7 @@ public sealed partial class JavaEnvService : BackgroundService
 
     public void SetDefaultJavaPath(string path)
     {
+        path = JavaExecutablePreference.PreferWindowed(path);
         lock (_sync)
         {
             if (path.Length > 0 && (!Path.IsPathFullyQualified(path) || !File.Exists(path)
@@ -183,7 +187,8 @@ public sealed partial class JavaEnvService : BackgroundService
         JavaInfoObj? fromEnvironment = null;
         if (!string.IsNullOrWhiteSpace(javaHome))
         {
-            var executable = Path.Combine(javaHome, "bin", OperatingSystem.IsWindows() ? "java.exe" : "java");
+            var executable = JavaExecutablePreference.PreferWindowed(
+                Path.Combine(javaHome, "bin", OperatingSystem.IsWindows() ? "java.exe" : "java"));
             fromEnvironment = await Task.Run(() => JavaHelper.GetJavaInfo(executable), cancellationToken);
             if (fromEnvironment?.MajorVersion == majorVersion)
                 return fromEnvironment;
@@ -203,7 +208,7 @@ public sealed partial class JavaEnvService : BackgroundService
         try
         {
             if (JvmPath.FindJava(majorVersion) is { } java && java.GetPath() is { } path && File.Exists(path))
-                return java with { Path = path };
+                return java with { Path = JavaExecutablePreference.PreferWindowed(path) };
 
             return MatchInstalledJava(JvmPath.Jvms.Values.Select(item => item with { Path = item.GetPath() }), majorVersion);
         }
@@ -216,6 +221,7 @@ public sealed partial class JavaEnvService : BackgroundService
     }
 
     private static JavaInfoObj? MatchInstalledJava(IEnumerable<JavaInfoObj> candidates, int majorVersion) => candidates
+        .Select(item => item with { Path = JavaExecutablePreference.PreferWindowed(item.Path) })
         .Where(item => File.Exists(item.Path) && (item.MajorVersion == majorVersion
             || majorVersion > 8 && item.MajorVersion > majorVersion))
         .OrderByDescending(item => item.MajorVersion == majorVersion)

@@ -112,7 +112,27 @@ public sealed partial class ModpackImportService
             if (data is null || data.ModId != reference.ProjectID || data.Id != reference.FileID)
                 throw new IOException($"无法取得 CurseForge 文件 {reference.ProjectID}/{reference.FileID}。请检查 ColorMC 初始化中的 CurseForgeKey 和网络，具体原因见日志。");
             if (string.IsNullOrWhiteSpace(data.DownloadUrl))
-                throw new IOException($"CurseForge 文件未提供 API 下载地址：{data.DisplayName}。请联系作者或从网站手动获取。");
+            {
+                // 批量元数据可能不完整，补查同一文件；仍无地址时保留失败，不能漏装或换成其他版本。
+                var refreshed = (await CurseForgeAPI.GetModAsync(reference, token))?.Data;
+                token.ThrowIfCancellationRequested();
+                if (refreshed?.ModId == reference.ProjectID && refreshed.Id == reference.FileID)
+                    data = refreshed;
+                if (string.IsNullOrWhiteSpace(data.DownloadUrl))
+                {
+                    var project = await CurseForgeAPI.GetModInfoAsync(reference.ProjectID).WaitAsync(token);
+                    var website = project?.Data?.Id == reference.ProjectID ? project.Data.Links?.WebsiteUrl : null;
+                    // 页面只用于帮助用户定位文件，不作为自动下载地址，也不根据文件 ID 拼接 CDN 地址。
+                    var page = Uri.TryCreate(website, UriKind.Absolute, out var uri) && uri.Scheme == "https"
+                        && (uri.Host.Equals("curseforge.com", StringComparison.OrdinalIgnoreCase)
+                            || uri.Host.EndsWith(".curseforge.com", StringComparison.OrdinalIgnoreCase))
+                        ? $" 项目页面：{uri.AbsoluteUri}" : "";
+                    throw new IOException($"CurseForge 未提供文件的下载地址：{data.DisplayName}（{data.FileName}），"
+                        + $"项目 ID {reference.ProjectID}，文件 ID {reference.FileID}。"
+                        + "可能与第三方分发限制或文件不可用有关，请到 CurseForge 核对该文件。"
+                        + "当前尚不支持手动补文件后继续导入，安装已停止。" + page);
+                }
+            }
             var filename = ModpackArchive.NormalizePath(data.FileName);
             if (filename.Contains('/')) throw new InvalidDataException("CurseForge 返回了无效的文件名。");
             var location = await CurseForgeHelper.GetItemPathAsync(game, data);

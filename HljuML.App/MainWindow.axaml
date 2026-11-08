@@ -311,5 +311,6 @@
         <Border x:Name="SelectionScrim" IsVisible="False" IsHitTestVisible="False"
                 CornerRadius="{Binding #WindowFrame.CornerRadius}"
                 Background="{arc:ArcDesignTokenResource Scrim}" />
+        <views:ModpackImportDialog DataContext="{Binding ModpackImport}" />
     </Grid>
 </Window>

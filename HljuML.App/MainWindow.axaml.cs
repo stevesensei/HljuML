@@ -5,6 +5,7 @@ using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Input;
 using Avalonia.Threading;
 using HljuML.App.Core;
 using HljuML.App.Views;
@@ -33,6 +34,9 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        DragDrop.SetAllowDrop(this, true);
+        AddHandler(DragDrop.DragOverEvent, OnModpackDragOver, RoutingStrategies.Tunnel);
+        AddHandler(DragDrop.DropEvent, OnModpackDrop, RoutingStrategies.Tunnel);
         PropertyChanged += OnWindowPropertyChanged;
         _downloadsTimer.Tick += OnDownloadsTick;
     }
@@ -64,6 +68,7 @@ public partial class MainWindow : Window
         _downloadsTimer.Stop();
         _downloadsTimer.Tick -= OnDownloadsTick;
         _closed = true;
+        if (DataContext is MainViewModel viewModel) viewModel.ModpackImport.IsOpen = false;
         if (_downloads is not null)
             _downloads.TaskCreated -= OnDownloadTaskCreated;
         _downloadManager?.Close();

@@ -28,10 +28,9 @@ public sealed partial class CommunityResourceViewModel : INotifyPropertyChanged,
     private CommunityResourceItem? _selectedResource;
     private CommunityResourceType _resourceType = CommunityResourceType.Mod;
 
-    public CommunityResourceViewModel(GameInstanceService gameInstances, ModpackImportService imports, CancellationToken stopping)
+    public CommunityResourceViewModel(GameInstanceService gameInstances, CancellationToken stopping)
     {
         _gameInstances = gameInstances;
-        _imports = imports;
         _stopping = stopping;
         CategoryOptions = CategoriesFor(_resourceType);
     }

@@ -10,4 +10,5 @@ public sealed record ModpackInfo(string Name, string PackVersion, string Minecra
     Loaders Loader, string? LoaderVersion, ModpackFormat Format, int FileCount);
 
 /// <summary>队列拥有的压缩包快照；用户修改或移动原文件不会改变已提交的安装。</summary>
-internal sealed record PreparedModpack(string ArchivePath, ModpackInfo Info, bool IncludeOptionalFiles);
+internal sealed record PreparedModpack(string ArchivePath, ModpackInfo Info, bool IncludeOptionalFiles,
+    int? RequiredJavaMajor = null, bool DownloadJava = false);

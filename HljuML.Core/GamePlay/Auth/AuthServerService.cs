@@ -7,6 +7,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HljuML.Core.GamePlay.Auth;
 
+/// <summary>
+/// Ygg服务器认证
+/// </summary>
+/// <param name="db"></param>
 public sealed class AuthServerService(HljuMLDbContext db)
 {
     private const string ApiLocationHeader = "X-Authlib-Injector-API-Location";
@@ -21,6 +25,11 @@ public sealed class AuthServerService(HljuMLDbContext db)
         MaxResponseContentBufferSize = 1024 * 1024
     };
 
+    /// <summary>
+    /// 获取全部认证服务器
+    /// </summary>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
     public async Task<ServiceResult<List<CustomAuthServer>>> GetAllAuthServers(
         CancellationToken cancellationToken = default)
     {

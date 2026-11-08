@@ -37,6 +37,19 @@ public sealed partial class GameInstallationService
             Encoding = OperatingSystem.IsWindows() ? LogEncoding.GBK : default,
             Mods = [], CustomJson = [], LaunchData = new() { AddTime = DateTime.Now }
         };
+        // Java 是此实例的依赖：在发布前完成安装或匹配，并把路径写入实例配置，避免全局默认覆盖。
+        if (installation.Modpack is { RequiredJavaMajor: > 0 } packOptions)
+        {
+            var runtimes = scopeFactory.CreateScope();
+            using (runtimes)
+            {
+                var runtime = runtimes.ServiceProvider.GetRequiredService<JavaRuntimeService>();
+                var java = packOptions.DownloadJava
+                    ? await runtime.EnsureAsync(packOptions.RequiredJavaMajor.Value, installation.OperationId, downloads, token)
+                    : await runtime.FindExactAsync(packOptions.RequiredJavaMajor.Value, token);
+                if (java is not null) game.JvmLocal = java.Path;
+            }
+        }
         IReadOnlyList<Artifact> artifacts;
         try { artifacts = await PrepareFilesAsync(installation.OperationId, game, token); }
         catch

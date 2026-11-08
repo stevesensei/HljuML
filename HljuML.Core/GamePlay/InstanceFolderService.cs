@@ -9,7 +9,7 @@ using HljuML.Shared.Model;
 
 namespace HljuML.Core.GamePlay;
 
-internal static class ColorMcInstanceFolder
+internal static class InstanceFolderService
 {
     internal static string? GetResourceDirectory(string instanceDirectory)
     {

@@ -20,7 +20,7 @@ using Microsoft.Extensions.Logging;
 namespace HljuML.Core.GamePlay;
 
 public sealed class GameInstanceService(IServiceScopeFactory scopeFactory, JavaEnvService javaEnvironments,
-    DownloadManagementService downloads, ColorMcOperationCoordinator coordinator,
+    DownloadManagementService downloads, OperationCoordinatorService coordinatorService,
     ILogger<GameInstanceService> logger) : IHostedService
 {
     private readonly ConcurrentDictionary<Guid, RunningProcess> _running = new();
@@ -58,8 +58,8 @@ public sealed class GameInstanceService(IServiceScopeFactory scopeFactory, JavaE
         path = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
         try
         {
-            using var operation = await coordinator.EnterAsync(token);
-            var games = await Task.Run(() => ColorMcInstanceFolder.ReadInstances(path, token).ToArray(), token);
+            using var operation = await coordinatorService.EnterAsync(token);
+            var games = await Task.Run(() => InstanceFolderService.ReadInstances(path, token).ToArray(), token);
             await using var scope = scopeFactory.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<HljuMLDbContext>();
             await using var transaction = await db.Database.BeginTransactionAsync(token);
@@ -101,7 +101,7 @@ public sealed class GameInstanceService(IServiceScopeFactory scopeFactory, JavaE
     {
         try
         {
-            using var operation = await coordinator.EnterAsync(stoppingToken);
+            using var operation = await coordinatorService.EnterAsync(stoppingToken);
             if (_running.ContainsKey(instanceId))
                 return ServiceResult<int?>.FailureResult(message: "该实例已经在运行。");
 
@@ -129,7 +129,7 @@ public sealed class GameInstanceService(IServiceScopeFactory scopeFactory, JavaE
                 return ServiceResult<int?>.FailureResult(message: gameResult.Message);
 
             using var resources = instanceData.GameFolder is { } folder
-                && ColorMcInstanceFolder.GetResourceDirectory(folder.AbsolutePath) is { } resourceDirectory
+                && InstanceFolderService.GetResourceDirectory(folder.AbsolutePath) is { } resourceDirectory
                 ? MinecraftPath.UseResourceDirectory(resourceDirectory)
                 : null;
 
@@ -150,6 +150,10 @@ public sealed class GameInstanceService(IServiceScopeFactory scopeFactory, JavaE
                         game = game with { JvmLocal = java.Path };
                 }
             }
+
+            // 兼容之前保存为 java.exe 的实例；只选择同一目录的 javaw.exe，不改变实例使用的 Java 版本。
+            if (game.JvmLocal is { Length: > 0 } javaPath)
+                game = game with { JvmLocal = JavaExecutablePreference.PreferWindowed(javaPath) };
 
             var reporter = progress is null ? null : new GameLaunchReporter(progress);
             var args = new GameLaunchArg { Auth = login, Gui = reporter };
@@ -234,7 +238,7 @@ public sealed class GameInstanceService(IServiceScopeFactory scopeFactory, JavaE
             $"hljuml-{instance.Id:N}", GameInstallationService.PendingMarker)))
             return ServiceResult<GameSettingObj>.FailureResult(message: "实例尚未完成安装登记，请检查下载管理器。");
         if (instance.GameFolder is { } folder && !LauncherPaths.IsDefaultInstanceDirectory(folder.AbsolutePath))
-            return await ColorMcInstanceFolder.ResolveAsync(instance, folder.AbsolutePath, progress, cancellationToken);
+            return await InstanceFolderService.ResolveAsync(instance, folder.AbsolutePath, progress, cancellationToken);
 
         if (InstancesPath.GetGame(instance.Id) is { } existing)
         {
@@ -244,9 +248,9 @@ public sealed class GameInstanceService(IServiceScopeFactory scopeFactory, JavaE
         }
 
         if (Directory.Exists(LauncherPaths.DefaultInstanceDirectory)
-            && ColorMcInstanceFolder.ReadInstances(LauncherPaths.DefaultInstanceDirectory, cancellationToken)
+            && InstanceFolderService.ReadInstances(LauncherPaths.DefaultInstanceDirectory, cancellationToken)
                 .Any(game => game.UUID == instance.Id))
-            return await ColorMcInstanceFolder.ResolveAsync(instance, LauncherPaths.DefaultInstanceDirectory,
+            return await InstanceFolderService.ResolveAsync(instance, LauncherPaths.DefaultInstanceDirectory,
                 progress, cancellationToken);
 
         if (instance.Loader != Loaders.Normal)

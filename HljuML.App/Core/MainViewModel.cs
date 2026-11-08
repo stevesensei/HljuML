@@ -14,6 +14,7 @@ using HljuML.Core.Model.Entity;
 using HljuML.Shared.Model;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace HljuML.App.Core;
 
@@ -39,7 +40,8 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
 
     public MainViewModel(GameInstanceService gameInstances, IHostApplicationLifetime appLifetime,
         IServiceScopeFactory scopeFactory, DownloadManagementService downloads, JavaEnvService java,
-        GameCatalogService catalog, GameInstallationService installations, ModpackImportService imports)
+        GameCatalogService catalog, GameInstallationService installations, ModpackImportService imports,
+        JavaRuntimeService runtimes, ILogger<ModpackImportViewModel> importLogger)
     {
         _gameInstances = gameInstances;
         _appLifetime = appLifetime;
@@ -48,7 +50,8 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
         Downloads = new DownloadQueueViewModel(downloads);
         GameDownloads = new GameDownloadViewModel(catalog, installations, appLifetime.ApplicationStopping);
         DownloadHub = new DownloadHubViewModel(GameDownloads,
-            new CommunityResourceViewModel(gameInstances, imports, appLifetime.ApplicationStopping));
+            new CommunityResourceViewModel(gameInstances, appLifetime.ApplicationStopping));
+        ModpackImport = new ModpackImportViewModel(imports, runtimes, importLogger, appLifetime.ApplicationStopping);
         JavaSettings = new JavaSettingsViewModel(java, appLifetime.ApplicationStopping);
         RunningInstances = _gameInstances.GetRunningInstances();
         _gameInstances.RunningInstancesChanged += OnRunningInstancesChanged;
@@ -61,6 +64,7 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
     public GameDownloadViewModel GameDownloads { get; }
     public DownloadHubViewModel DownloadHub { get; }
     public JavaSettingsViewModel JavaSettings { get; }
+    public ModpackImportViewModel ModpackImport { get; }
 
     public string PlayerName => _selectedProfile?.Name ?? "选择玩家";
     public object PlayerAvatar => GetPlayerAvatar(_selectedProfile?.Id);
@@ -301,6 +305,7 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
     public void Dispose()
     {
         _disposed = true;
+        ModpackImport.Dispose();
         JavaSettings.Dispose();
         DownloadHub.Dispose();
         GameDownloads.Dispose();

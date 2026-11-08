@@ -34,8 +34,19 @@ public sealed partial class ModpackImportService(GameInstallationService install
     public async Task<ServiceResult<Guid>> EnqueueAsync(string file, string? instanceName = null,
         bool includeOptionalFiles = true, CancellationToken cancellationToken = default)
     {
+        var result = await PrepareAsync(file, cancellationToken);
+        if (result.Data is not { } session)
+            return ServiceResult<Guid>.FailureResult(message: result.Message);
+        using (session)
+            return await EnqueueAsync(session, instanceName ?? session.SuggestedName,
+                includeOptionalFiles: includeOptionalFiles, cancellationToken: cancellationToken);
+    }
+
+    /// <summary>冻结并解析输入文件；拖入和手动选择共用此入口，确认期间不读取原包。</summary>
+    public async Task<ServiceResult<ModpackImportSession>> PrepareAsync(string file,
+        CancellationToken cancellationToken = default)
+    {
         string? snapshot = null;
-        var queued = false;
         try
         {
             ValidateSource(file);
@@ -48,21 +59,49 @@ public sealed partial class ModpackImportService(GameInstallationService install
                 81920, FileOptions.Asynchronous))
                 await input.CopyToAsync(output, cancellationToken);
             var info = await Task.Run(() => InspectFile(snapshot), cancellationToken);
-            var prepared = new PreparedModpack(snapshot, info, includeOptionalFiles);
-            var request = new GameInstallationRequest(instanceName ?? $"{info.Name}-{info.PackVersion}",
-                info.MinecraftVersion, info.Loader, info.LoaderVersion);
+            cancellationToken.ThrowIfCancellationRequested();
+            var session = new ModpackImportSession(snapshot, info, logger);
+            snapshot = null;
+            return ServiceResult<ModpackImportSession>.SuccessResult(session);
+        }
+        catch (Exception error) when (IsImportError(error))
+        {
+            logger.LogWarning(error, "Could not queue modpack {File}", file);
+            return ServiceResult<ModpackImportSession>.FailureResult(message: $"无法读取整合包：{error.Message}");
+        }
+        finally
+        {
+            if (snapshot is not null) ReleaseArchive(snapshot, logger);
+        }
+    }
+
+    /// <summary>提交用户确认的名称和 Java 选项；失败时归还快照，允许在同一窗口内修改后重试。</summary>
+    public async Task<ServiceResult<Guid>> EnqueueAsync(ModpackImportSession session, string instanceName,
+        int? requiredJavaMajor = null, bool downloadJava = false, bool includeOptionalFiles = true,
+        CancellationToken cancellationToken = default)
+    {
+        string? archive = null;
+        var queued = false;
+        try
+        {
+            if (downloadJava && requiredJavaMajor is not > 0)
+                throw new ArgumentException("无法确定需要下载的 Java 版本，请重新解析版本信息。");
+            archive = session.ClaimArchive();
+            var info = session.Info;
+            var prepared = new PreparedModpack(archive, info, includeOptionalFiles, requiredJavaMajor, downloadJava);
+            var request = new GameInstallationRequest(instanceName, info.MinecraftVersion, info.Loader, info.LoaderVersion);
             var result = await installations.EnqueueModpackAsync(request, prepared, cancellationToken);
             queued = result.Status == ServiceStatus.Success;
             return result;
         }
         catch (Exception error) when (IsImportError(error))
         {
-            logger.LogWarning(error, "Could not queue modpack {File}", file);
+            logger.LogWarning(error, "Could not queue confirmed modpack {Name}", session.Info.Name);
             return ServiceResult<Guid>.FailureResult(message: $"无法导入整合包：{error.Message}");
         }
         finally
         {
-            if (!queued && snapshot is not null) ReleaseArchive(snapshot, logger);
+            if (!queued && archive is not null) session.ReturnArchive(archive);
         }
     }
 

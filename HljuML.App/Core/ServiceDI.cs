@@ -22,7 +22,8 @@ public static class ServiceCollectionExtensions
         collection.AddHostedService<SqliteDatabaseInitializer>();
 
         collection.AddSingleton<JavaEnvService>();
-        collection.AddSingleton<ColorMcOperationCoordinator>();
+        collection.AddSingleton<JavaRuntimeService>();
+        collection.AddSingleton<OperationCoordinatorService>();
         collection.AddSingleton<GameCatalogService>();
         collection.AddSingleton<GameInstallationService>();
         collection.AddSingleton<ModpackImportService>();

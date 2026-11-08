@@ -1,6 +1,6 @@
 namespace HljuML.Core.GamePlay;
 
-public sealed class ColorMcOperationCoordinator
+public sealed class OperationCoordinatorService
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
 

@@ -17,7 +17,7 @@ public sealed partial class JavaEnvService
         if (!Path.IsPathFullyQualified(path) || !validName || !File.Exists(path))
             throw new ArgumentException("请选择存在的 javaw.exe 或 java.exe 文件。");
 
-        path = Path.GetFullPath(path);
+        path = JavaExecutablePreference.PreferWindowed(Path.GetFullPath(path));
         var java = await Task.Run(() => JavaHelper.GetJavaInfo(path), cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         if (java is null || java.MajorVersion <= 0)

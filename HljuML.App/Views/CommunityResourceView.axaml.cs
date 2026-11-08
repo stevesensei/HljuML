@@ -15,8 +15,8 @@ public partial class CommunityResourceView : UserControl
     /// <summary>UI 只负责选文件，校验和安装由视图模型及导入服务处理。</summary>
     private async void OnImportModpackClicked(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is CommunityResourceViewModel viewModel)
-            await viewModel.ImportModpackAsync(ChooseModpackAsync);
+        if (DataContext is CommunityResourceViewModel viewModel && TopLevel.GetTopLevel(this) is MainWindow window)
+            await viewModel.ImportModpackAsync(ChooseModpackAsync, file => window.ImportModpacksAsync([file]));
     }
 
     /// <summary>通过系统文件选择器获取本地路径；取消选择不创建安装任务。</summary>
