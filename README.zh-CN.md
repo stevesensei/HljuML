@@ -2,9 +2,13 @@
 
 [English](README.md) | 简体中文
 
+> [!IMPORTANT]
+>
+> HljuML当前仍在各种开发，请暂时不要用于生产环境
+
 HljuML 是一款基于 [ColorMC](https://github.com/Coloryr/ColorMC) 开发的 Minecraft Java 版桌面启动器，将账号管理、游戏实例、游戏下载和 Java 环境选择整合到同一个界面中。
 
-项目正在开发中，社区资源浏览和整合包导入等功能仍在完善。
+本项目为黑龙江大学Minecraft同好会开发，你可以在[这里](https://qm.qq.com/q/tHn03n12Mg)加入我们
 
 ## 支持平台
 
@@ -13,6 +17,18 @@ HljuML 是一款基于 [ColorMC](https://github.com/Coloryr/ColorMC) 开发的 M
 | Windows | 当前开发及构建验证平台。 |
 | Linux | 计划支持的桌面平台，尚未验证 HljuML 的兼容性。 |
 | macOS | 计划支持的桌面平台，尚未验证 HljuML 的兼容性。 |
+
+## 项目图片
+
+<details>
+<summary>截图</summary>
+
+![主页](Assets/main.png)
+
+![游戏实例下载](Assets/download.png)
+
+</details>
+
 
 ## 从源码构建
 
@@ -41,3 +57,9 @@ dotnet run --project HljuML.App/HljuML.App.csproj -c Release --no-build
 核心依赖 ColorMC 同样采用 [Apache-2.0](https://github.com/Coloryr/ColorMC/blob/main/LICENSE)。其他依赖保留各自的许可证，包括 MIT、BSD、ISC 和 SIL Open Font License。依赖协议摘要及开发工具的单独条款见[第三方声明](THIRD_PARTY_NOTICES.md)。
 
 第三方图片、标志和商标不因本项目的许可证而被重新授权。HljuML 是独立项目，与 Mojang 或 Microsoft 无隶属关系。
+
+## 特别鸣谢
+
+- [ColorMC](https://github.com/Coloryr/ColorMC)
+
+  - 感谢ColorMC.Core所提供的Minecraft启动器全家桶级基础功能，HljuML在其基础上开发

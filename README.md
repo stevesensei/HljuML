@@ -2,9 +2,13 @@
 
 English | [简体中文](README.zh-CN.md)
 
+> [!IMPORTANT]
+>
+> HljuML still under active development, please do not use it in production environments for now.
+
 HljuML is a desktop launcher for Minecraft: Java Edition, built on [ColorMC](https://github.com/Coloryr/ColorMC). It brings account management, game instances, game downloads, and Java environment selection into one interface.
 
-The project is under active development. Community resource browsing and modpack importing are still being developed.
+The project is develop for Heilongjiang University Minecraft Club, You can join us [here](https://qm.qq.com/q/tHn03n12Mg)
 
 ## Platforms
 
@@ -13,6 +17,17 @@ The project is under active development. Community resource browsing and modpack
 | Windows | Current development and build verification platform. |
 | Linux | Intended desktop target; not yet verified for HljuML. |
 | macOS | Intended desktop target; not yet verified for HljuML. |
+
+## Screenshots
+
+<details>
+<summary>Img</summary>
+
+![主页](Assets/main.png)
+
+![游戏实例下载](Assets/download.png)
+
+</details>
 
 ## Build from source
 
@@ -41,3 +56,10 @@ Original HljuML source code is licensed under the [Apache License 2.0](LICENSE),
 ColorMC is also [Apache-2.0 licensed](https://github.com/Coloryr/ColorMC/blob/main/LICENSE). Other dependencies retain their own licenses, including MIT, BSD, ISC, and the SIL Open Font License. See [Third-party notices](THIRD_PARTY_NOTICES.md) for the dependency license summary and developer-tool exceptions.
 
 Third-party artwork, logos, and trademarks are not relicensed by this project's license. HljuML is an independent project and is not affiliated with Mojang or Microsoft.
+
+
+## Special Thanks
+
+- [ColorMC](https://github.com/Coloryr/ColorMC)
+
+    - Thanks `ColorMC.Core` provide a full suite of Minecraft launcher features, HljuML developed on top of it
