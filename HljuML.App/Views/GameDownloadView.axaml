@@ -197,9 +197,9 @@
                                                 </Grid>
                                             </arc:ExpandableCard.Header>
                                             <StackPanel Spacing="{arc:ArcDesignTokenResource Space3}">
-                                                <arc:Select Label="{Binding #DownloadRoot.DataContext.LoaderVersionLabel}"
-                                                            ItemsSource="{Binding #DownloadRoot.DataContext.LoaderVersions}"
-                                                            SelectedItem="{Binding #DownloadRoot.DataContext.SelectedLoaderVersion, Mode=TwoWay}"
+                                                <arc:Select Label="{CompiledBinding #DownloadRoot.((vm:GameDownloadViewModel)DataContext).LoaderVersionLabel}"
+                                                            ItemsSource="{CompiledBinding #DownloadRoot.((vm:GameDownloadViewModel)DataContext).LoaderVersions}"
+                                                            SelectedItem="{CompiledBinding #DownloadRoot.((vm:GameDownloadViewModel)DataContext).SelectedLoaderVersion, Mode=TwoWay}"
                                                             IsVisible="{Binding IsSelected}" />
                                                 <arc:Button Content="移除加载器" Variant="Danger" Size="Small"
                                                             HorizontalAlignment="Left" IsVisible="{Binding IsSelected}"

@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 
 namespace HljuML.Core.GamePlay;
 
-public sealed class JavaEnvService : BackgroundService
+public sealed partial class JavaEnvService : BackgroundService
 {
     private readonly ILogger<JavaEnvService> _logger;
     private readonly object _sync = new();
@@ -18,6 +18,7 @@ public sealed class JavaEnvService : BackgroundService
     private string _defaultJavaPath = "";
     private bool _isScanning;
     private string? _scanError;
+    private IReadOnlyList<string> _manualJavaPaths = [];
 
     public JavaEnvService(ILogger<JavaEnvService> logger)
     {
@@ -25,8 +26,13 @@ public sealed class JavaEnvService : BackgroundService
         try
         {
             if (File.Exists(LauncherPaths.JavaSettingsPath))
-                _defaultJavaPath = JsonSerializer.Deserialize<JavaPreferences>(
-                    File.ReadAllText(LauncherPaths.JavaSettingsPath))?.DefaultJavaPath ?? "";
+            {
+                var preferences = JsonSerializer.Deserialize<JavaPreferences>(
+                    File.ReadAllText(LauncherPaths.JavaSettingsPath));
+                _defaultJavaPath = preferences?.DefaultJavaPath ?? "";
+                _manualJavaPaths = preferences?.ManualJavaPaths?.Where(path => !string.IsNullOrWhiteSpace(path)
+                    && Path.IsPathFullyQualified(path)).ToArray() ?? [];
+            }
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException)
         {
@@ -88,7 +94,8 @@ public sealed class JavaEnvService : BackgroundService
         try
         {
             var found = await JavaHelper.FindJava() ?? [];
-            var paths = new List<string> { DefaultJavaPath };
+            List<string> paths;
+            lock (_sync) paths = [_defaultJavaPath, .. _manualJavaPaths];
             if (Environment.GetEnvironmentVariable("JAVA_HOME") is { Length: > 0 } javaHome)
                 paths.Add(Path.Combine(javaHome, "bin", OperatingSystem.IsWindows() ? "javaw.exe" : "java"));
             if (Directory.Exists(JvmPath.JavaDir))
@@ -107,10 +114,14 @@ public sealed class JavaEnvService : BackgroundService
                 .ThenBy(java => java.Version).ThenBy(java => java.Path, comparer).ToArray();
             lock (_sync)
             {
-                _environments = environments;
+                _environments = environments.Concat(_environments.Where(java => _manualJavaPaths.Contains(java.Path, comparer)))
+                    .Where(java => File.Exists(java.Path))
+                    .DistinctBy(java => Path.GetFullPath(java.Path), comparer)
+                    .OrderByDescending(java => java.MajorVersion).ThenBy(java => java.Version)
+                    .ThenBy(java => java.Path, comparer).ToArray();
                 _scanError = null;
+                return _environments;
             }
-            return environments;
         }
         catch (Exception error)
         {
@@ -134,17 +145,7 @@ public sealed class JavaEnvService : BackgroundService
                     ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))))
                 throw new ArgumentException("请选择扫描到的可用 Java 环境。", nameof(path));
 
-            Directory.CreateDirectory(LauncherPaths.ColorMcDirectory);
-            var temporary = Path.Combine(LauncherPaths.ColorMcDirectory, $".java-{Guid.NewGuid():N}.tmp");
-            try
-            {
-                File.WriteAllText(temporary, JsonSerializer.Serialize(new JavaPreferences(path)));
-                File.Move(temporary, LauncherPaths.JavaSettingsPath, overwrite: true);
-            }
-            finally
-            {
-                File.Delete(temporary);
-            }
+            SavePreferences(path, _manualJavaPaths);
             _defaultJavaPath = path;
         }
         Changed?.Invoke();
@@ -222,5 +223,5 @@ public sealed class JavaEnvService : BackgroundService
         .ThenByDescending(item => item.MajorVersion)
         .FirstOrDefault();
 
-    private sealed record JavaPreferences(string DefaultJavaPath);
+    private sealed record JavaPreferences(string DefaultJavaPath, IReadOnlyList<string>? ManualJavaPaths = null);
 }

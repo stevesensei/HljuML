@@ -19,6 +19,9 @@ public sealed class JavaSettingsViewModel : INotifyPropertyChanged, IDisposable
     private bool _refreshing;
     private bool _disposed;
     private string? _error;
+    private bool _isChoosingJava;
+
+    public static SelectOption BrowseJavaOption { get; } = new(new object(), "手动选择 Java…");
 
     public JavaSettingsViewModel(JavaEnvService java, CancellationToken stopping)
     {
@@ -31,7 +34,7 @@ public sealed class JavaSettingsViewModel : INotifyPropertyChanged, IDisposable
     public event PropertyChangedEventHandler? PropertyChanged;
     public IReadOnlyList<SelectOption> JavaOptions { get; private set; } = [];
     public bool IsScanning { get; private set; }
-    public bool CanScan => !IsScanning;
+    public bool CanScan => !IsScanning && !_isChoosingJava;
     public string ScanStatus { get; private set; } = "";
     public string? ErrorMessage => _error;
     public bool HasError => _error is not null;
@@ -73,6 +76,45 @@ public sealed class JavaSettingsViewModel : INotifyPropertyChanged, IDisposable
         catch (OperationCanceledException) when (_stopping.IsCancellationRequested) { }
     }
 
+    public async Task ChooseJavaAsync(Func<Task<string?>> chooseFile)
+    {
+        if (!CanScan) return;
+        _isChoosingJava = true;
+        _error = null;
+        Notify(nameof(CanScan));
+        Notify(nameof(ErrorMessage));
+        Notify(nameof(HasError));
+        try
+        {
+            await Task.Yield();
+            var path = await chooseFile();
+            if (path is not null && !_disposed)
+            {
+                await _java.AddManualJavaAsync(path, _stopping);
+                Refresh();
+            }
+        }
+        catch (OperationCanceledException) when (_stopping.IsCancellationRequested) { }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException
+            or NotSupportedException)
+        {
+            _error = error is ArgumentException or NotSupportedException ? error.Message
+                : "无法读取或保存 Java 环境，请检查文件及目录权限后重试。";
+        }
+        finally
+        {
+            _isChoosingJava = false;
+            if (!_disposed)
+            {
+                Notify(nameof(CanScan));
+                Notify(nameof(SelectedJavaOption));
+                Notify(nameof(SelectedPathDescription));
+                Notify(nameof(ErrorMessage));
+                Notify(nameof(HasError));
+            }
+        }
+    }
+
     private void OnJavaChanged() => Dispatcher.UIThread.Post(() =>
     {
         if (!_disposed)
@@ -88,6 +130,7 @@ public sealed class JavaSettingsViewModel : INotifyPropertyChanged, IDisposable
             new SelectOption(java.Path, $"{java.Type} {java.Version} · {java.Arch} · {java.Path}")));
         if (selected.Length > 0 && !environments.Any(java => java.Path == selected))
             options.Add(new SelectOption(selected, $"已保存的 Java（未扫描到） · {selected}"));
+        options.Add(BrowseJavaOption);
 
         _refreshing = true;
         try
@@ -100,7 +143,7 @@ public sealed class JavaSettingsViewModel : INotifyPropertyChanged, IDisposable
             IsScanning = _java.IsScanning;
             ScanStatus = IsScanning ? "正在扫描已安装的 Java…"
                 : environments.Count > 0 ? $"已找到 {environments.Count} 个 Java 环境。每次打开启动器时自动扫描。"
-                : "尚未找到 Java。安装 Java 后，点击“扫描 Java”重试。";
+                : "尚未找到 Java。可以扫描，或在下拉框中手动选择 Java 文件。";
             _error = _java.ScanError;
             if (optionsChanged)
                 Notify(nameof(JavaOptions));

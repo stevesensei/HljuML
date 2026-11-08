@@ -7,9 +7,11 @@
     <arc:Card Title="Java 运行环境" Description="选择立即保存，实例配置优先。">
         <StackPanel Spacing="{arc:ArcDesignTokenResource Space4}">
             <arc:Select Label="默认 Java 环境"
+                        Description="可在列表底部手动选择 javaw.exe 或 java.exe。"
                         ItemsSource="{Binding JavaOptions}"
                         SelectedItem="{Binding SelectedJavaOption, Mode=TwoWay}"
                         IsEnabled="{Binding CanScan}"
+                        SelectionChanged="OnJavaSelectionChanged"
                         HorizontalAlignment="Stretch" />
             <TextBlock Text="{Binding SelectedPathDescription}" TextWrapping="Wrap"
                        Foreground="{arc:ArcDesignTokenResource TextSecondary}"

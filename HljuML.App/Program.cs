@@ -74,9 +74,6 @@ class Program
     private static AppBuilder ConfigureAvalonia(AppBuilder builder)
         => builder
             .UsePlatformDetect()
-#if DEBUG
-            .WithDeveloperTools()
-#endif
             .WithInterFont()
             .UseArc(arc => arc
                 .UseArcControls()
