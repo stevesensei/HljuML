@@ -1,23 +1,22 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:arc="https://github.com/AIDotNet/TKCode.Arc"
+        xmlns:controls="using:HljuML.App.Controls"
         xmlns:local="using:HljuML.App.Views"
         x:Class="HljuML.App.Views.InstancePickerWindow"
-        Title="选择游戏实例" Width="880" Height="552" MinWidth="520" MinHeight="400"
-        WindowStartupLocation="CenterOwner" WindowDecorations="None"
-        ExtendClientAreaToDecorationsHint="True" ShowInTaskbar="False"
-        Background="Transparent" TransparencyLevelHint="Transparent"
+        Title="选择游戏实例"
+        Width="880"
+        Height="552"
+        MinWidth="520"
+        MinHeight="400"
+        WindowStartupLocation="CenterOwner"
+        WindowDecorations="None"
+        ExtendClientAreaToDecorationsHint="True"
+        ShowInTaskbar="False"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent"
         TransparencyBackgroundFallback="{arc:ArcDesignTokenResource SurfaceRaised}">
     <Window.Styles>
-        <Style Selector="TextBlock.picker-heading">
-            <Setter Property="Foreground" Value="{arc:ArcDesignTokenResource Foreground}" />
-            <Setter Property="FontSize" Value="{arc:ArcDesignTokenResource TypeLG}" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-        </Style>
-        <Style Selector="TextBlock.picker-secondary">
-            <Setter Property="Foreground" Value="{arc:ArcDesignTokenResource TextSecondary}" />
-            <Setter Property="FontSize" Value="{arc:ArcDesignTokenResource TypeSM}" />
-        </Style>
         <Style Selector="ListBox.picker-list">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
@@ -32,77 +31,96 @@
             <Setter Property="Background" Value="{arc:ArcDesignTokenResource AccentSubtle}" />
         </Style>
     </Window.Styles>
-
-    <Border Background="{arc:ArcDesignTokenResource SurfaceRaised}"
-            BorderBrush="{arc:ArcDesignTokenResource Border}" BorderThickness="1"
-            CornerRadius="{arc:ArcDesignTokenResource RadiusSurface}">
+    <Border Classes="app-dialog-frame">
         <Grid RowDefinitions="Auto,*,Auto">
-            <Border Background="{arc:ArcDesignTokenResource AccentSubtle}" Padding="20,12"
-                    CornerRadius="{arc:ArcDesignTokenResource RadiusSurface}">
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{arc:ArcDesignTokenResource Space3}">
-                    <Border Background="Transparent" WindowDecorationProperties.ElementRole="TitleBar">
-                        <TextBlock Classes="picker-heading" Text="选择游戏实例" VerticalAlignment="Center"
-                                   IsHitTestVisible="False" />
-                    </Border>
-                    <arc:Button Grid.Column="1" Variant="Ghost" Size="Small" Click="OnCancelClicked"
-                                AutomationProperties.Name="关闭实例选择" ToolTip.Tip="关闭">
-                        <arc:ArcGlyph Size="16" Data="M 6,6 L 18,18 M 18,6 L 6,18" IsHitTestVisible="False" />
-                    </arc:Button>
-                </Grid>
-            </Border>
-
+            <controls:DialogHeader Title="选择游戏实例" CloseRequested="OnCancelClicked" />
             <Grid Grid.Row="1" Margin="20,16,20,0" ColumnSpacing="{arc:ArcDesignTokenResource Space4}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="2*" MinWidth="152" MaxWidth="210" />
                     <ColumnDefinition Width="5*" />
                 </Grid.ColumnDefinitions>
-                <Border Background="{arc:ArcDesignTokenResource SurfaceMuted}" Padding="8"
+                <Border Background="{arc:ArcDesignTokenResource SurfaceMuted}"
+                        Padding="8"
                         CornerRadius="{arc:ArcDesignTokenResource RadiusPanel}">
                     <Grid RowDefinitions="Auto,*,Auto" RowSpacing="{arc:ArcDesignTokenResource Space2}">
-                        <TextBlock Classes="picker-secondary" Text="游戏文件夹" Margin="8,4,0,0" />
-                        <ListBox x:Name="GroupsList" Grid.Row="1" Classes="picker-list"
-                                 SelectionChanged="OnGroupChanged" AutomationProperties.Name="游戏文件夹筛选">
+                        <TextBlock Classes="app-description" Text="游戏文件夹" Margin="8,4,0,0" />
+                        <ListBox x:Name="GroupsList"
+                                 Grid.Row="1"
+                                 Classes="picker-list"
+                                 SelectionChanged="OnGroupChanged"
+                                 AutomationProperties.Name="游戏文件夹筛选">
                             <ListBox.ItemTemplate>
                                 <DataTemplate x:DataType="local:InstancePickerGroup">
-                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{arc:ArcDesignTokenResource Space2}">
+                                    <Grid ColumnDefinitions="*,Auto"
+                                          ColumnSpacing="{arc:ArcDesignTokenResource Space2}">
                                         <StackPanel>
-                                            <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"
+                                            <TextBlock Text="{Binding Name}"
+                                                       TextTrimming="CharacterEllipsis"
                                                        ToolTip.Tip="{Binding Name}" />
-                                            <TextBlock Text="{Binding AbsolutePath}" IsVisible="{Binding HasPath}"
-                                                       ToolTip.Tip="{Binding AbsolutePath}" Classes="picker-secondary"
+                                            <TextBlock Text="{Binding AbsolutePath}"
+                                                       IsVisible="{Binding HasPath}"
+                                                       ToolTip.Tip="{Binding AbsolutePath}"
+                                                       Classes="app-description"
                                                        TextTrimming="CharacterEllipsis" />
                                         </StackPanel>
-                                        <TextBlock Grid.Column="1" Classes="picker-secondary" Text="{Binding Count}"
+                                        <TextBlock Grid.Column="1"
+                                                   Classes="app-description"
+                                                   Text="{Binding Count}"
                                                    VerticalAlignment="Center" />
                                     </Grid>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
                         <StackPanel x:Name="FolderActions" Grid.Row="2" Spacing="{arc:ArcDesignTokenResource Space1}">
-                            <arc:Button x:Name="DefaultFolderButton" Content="添加默认目录" Size="Small" Variant="Secondary"
-                                        Padding="8,0" HorizontalAlignment="Stretch" Click="OnAddDefaultFolderClicked" />
-                            <arc:Button Content="添加其他目录" Size="Small" Variant="Ghost"
-                                        Padding="8,0" HorizontalAlignment="Stretch" Click="OnBrowseFolderClicked" />
+                            <arc:Button x:Name="DefaultFolderButton"
+                                        Content="添加默认目录"
+                                        Size="Small"
+                                        Variant="Secondary"
+                                        Padding="8,0"
+                                        HorizontalAlignment="Stretch"
+                                        Click="OnAddDefaultFolderClicked" />
+                            <arc:Button Content="添加其他目录"
+                                        Size="Small"
+                                        Variant="Ghost"
+                                        Padding="8,0"
+                                        HorizontalAlignment="Stretch"
+                                        Click="OnBrowseFolderClicked" />
                         </StackPanel>
                     </Grid>
                 </Border>
-
-                <Border Grid.Column="1" Background="{arc:ArcDesignTokenResource Surface}"
-                        BorderBrush="{arc:ArcDesignTokenResource BorderSubtle}" BorderThickness="1"
-                        CornerRadius="{arc:ArcDesignTokenResource RadiusPanel}" Padding="12">
+                <Border Grid.Column="1"
+                        Background="{arc:ArcDesignTokenResource Surface}"
+                        BorderBrush="{arc:ArcDesignTokenResource BorderSubtle}"
+                        BorderThickness="1"
+                        CornerRadius="{arc:ArcDesignTokenResource RadiusPanel}"
+                        Padding="12">
                     <Grid RowDefinitions="Auto,*" RowSpacing="{arc:ArcDesignTokenResource Space2}">
-                        <TextBlock x:Name="GroupTitle" Classes="picker-heading" Text="全部实例" Margin="8,0"
-                                   TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding #GroupTitle.Text}" />
-                        <arc:EmptyState x:Name="EmptyInstances" Grid.Row="1" Title="暂无游戏实例"
-                                        HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        <ListBox x:Name="InstancesList" Grid.Row="1" Classes="picker-list" IsVisible="False"
-                                 SelectionChanged="OnInstanceChanged" AutomationProperties.Name="游戏实例">
+                        <TextBlock x:Name="GroupTitle"
+                                   Classes="app-section-heading"
+                                   Text="全部实例"
+                                   Margin="8,0"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip.Tip="{Binding #GroupTitle.Text}" />
+                        <arc:EmptyState x:Name="EmptyInstances"
+                                        Grid.Row="1"
+                                        Title="暂无游戏实例"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center" />
+                        <ListBox x:Name="InstancesList"
+                                 Grid.Row="1"
+                                 Classes="picker-list"
+                                 IsVisible="False"
+                                 SelectionChanged="OnInstanceChanged"
+                                 AutomationProperties.Name="游戏实例">
                             <ListBox.ItemTemplate>
                                 <DataTemplate x:DataType="local:InstancePickerRow">
                                     <StackPanel Spacing="{arc:ArcDesignTokenResource Space1}">
-                                        <TextBlock Text="{Binding Instance.Name}" FontWeight="SemiBold"
-                                                   TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Instance.Name}" />
-                                        <TextBlock Classes="picker-secondary" Text="{Binding Description}"
+                                        <TextBlock Text="{Binding Instance.Name}"
+                                                   FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTip.Tip="{Binding Instance.Name}" />
+                                        <TextBlock Classes="app-description"
+                                                   Text="{Binding Description}"
                                                    TextTrimming="CharacterEllipsis" />
                                     </StackPanel>
                                 </DataTemplate>
@@ -111,15 +129,24 @@
                     </Grid>
                 </Border>
             </Grid>
-
-            <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="20,12,20,16"
+            <Grid Grid.Row="2"
+                  ColumnDefinitions="*,Auto"
+                  Margin="20,12,20,16"
                   ColumnSpacing="{arc:ArcDesignTokenResource Space3}">
-                <TextBlock x:Name="FolderError" IsVisible="False" TextWrapping="Wrap" VerticalAlignment="Center"
-                           FontSize="{arc:ArcDesignTokenResource TypeSM}" Foreground="{arc:ArcDesignTokenResource Danger}"
+                <TextBlock x:Name="FolderError"
+                           IsVisible="False"
+                           TextWrapping="Wrap"
+                           VerticalAlignment="Center"
+                           FontSize="{arc:ArcDesignTokenResource TypeSM}"
+                           Foreground="{arc:ArcDesignTokenResource Danger}"
                            AutomationProperties.LiveSetting="Polite" />
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="{arc:ArcDesignTokenResource Space2}">
                     <arc:Button Content="取消" Size="Medium" Variant="Secondary" Click="OnCancelClicked" />
-                    <arc:Button x:Name="UseInstanceButton" Content="使用实例" Size="Medium" IsDefault="True" IsEnabled="False"
+                    <arc:Button x:Name="UseInstanceButton"
+                                Content="使用实例"
+                                Size="Medium"
+                                IsDefault="True"
+                                IsEnabled="False"
                                 Click="OnUseInstanceClicked" />
                 </StackPanel>
             </Grid>

@@ -1,0 +1,52 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:arc="https://github.com/AIDotNet/TKCode.Arc"
+             xmlns:vm="using:HljuML.App.Core"
+             xmlns:controls="using:HljuML.App.Controls"
+             x:Class="HljuML.App.Views.Settings.AboutSettingsView"
+             x:DataType="vm:SettingsViewModel">
+    <StackPanel Spacing="{arc:ArcDesignTokenResource Space4}">
+        <controls:PageHeader Title="关于" />
+        <arc:Card Title="HljuML" Description="介绍待补充。">
+            <StackPanel Spacing="{arc:ArcDesignTokenResource Space2}">
+                <TextBlock Text="{Binding HljuMLVersion, StringFormat='HljuML 版本：{0}'}" ToolTip.Tip="启动器版本" />
+                <TextBlock Text="{Binding ColorMCVersion, StringFormat='ColorMC 版本：{0}'}" ToolTip.Tip="底层核心版本" />
+            </StackPanel>
+        </arc:Card>
+        <arc:Card Title="法律信息">
+            <StackPanel Spacing="{arc:ArcDesignTokenResource Space4}">
+                <TextBlock Text="HljuML 是独立项目，与 Mojang Studios、Microsoft 没有隶属或认可关系。Minecraft 名称及相关商标归其权利人所有。"
+                           TextWrapping="Wrap" />
+                <TextBlock Text="启动器在本机保存账户档案、设置和运行日志；登录与下载会连接对应认证服务器和资源提供方。请妥善保管本地数据，分享日志前检查其中的个人信息。"
+                           TextWrapping="Wrap" />
+            </StackPanel>
+        </arc:Card>
+        <arc:Card Title="开发人员" Description="感谢所有为HljuML做出贡献的开发者(包括ChatGPT小姐)">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="{arc:ArcDesignTokenResource Space3}">
+                <arc:Avatar DisplayName="stevesensei"
+                            Size="Large"
+                            VerticalAlignment="Center"
+                            Source="avares://HljuML.App/Assets/Dever/stevesensei.png"
+                            AutomationProperties.Name="头像" />
+                <StackPanel Grid.Column="1" Spacing="{arc:ArcDesignTokenResource Space1}" VerticalAlignment="Center">
+                    <TextBlock Text="stevesensei"
+                               FontSize="{arc:ArcDesignTokenResource TypeBase}"
+                               Foreground="{arc:ArcDesignTokenResource Foreground}" />
+                    <TextBlock Text="El Psy Congroo."
+                               TextWrapping="Wrap"
+                               FontSize="{arc:ArcDesignTokenResource TypeSM}"
+                               Foreground="{arc:ArcDesignTokenResource TextSecondary}" />
+                </StackPanel>
+                <arc:Button Grid.Column="2"
+                            Content="GitHub"
+                            Variant="Secondary"
+                            MinWidth="{arc:ArcDesignTokenResource Space24}"
+                            VerticalAlignment="Center"
+                            BorderBrush="{arc:ArcDesignTokenResource Accent}"
+                            Foreground="{arc:ArcDesignTokenResource Accent}"
+                            Click="OnDeveloperClicked"
+                            ToolTip.Tip="在默认浏览器中打开开发者 GitHub 主页" />
+            </Grid>
+        </arc:Card>
+    </StackPanel>
+</UserControl>

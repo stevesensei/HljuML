@@ -1,0 +1,11 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:arc="https://github.com/AIDotNet/TKCode.Arc">
+    <!-- TKCode.Arc 0.3.2-preview.1: full-width version rows must stretch the label slot. -->
+    <Style Selector="arc|Button.version-row /template/ arc|SpringSizeDecorator#PART_LabelSlot">
+        <Setter Property="Axis" Value="Height" />
+    </Style>
+    <Style Selector="arc|Button.version-row /template/ arc|ArcContentSwap#PART_Label">
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    </Style>
+</Styles>

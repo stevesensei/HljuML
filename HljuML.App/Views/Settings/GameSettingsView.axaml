@@ -1,0 +1,50 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:arc="https://github.com/AIDotNet/TKCode.Arc"
+             xmlns:vm="using:HljuML.App.Core"
+             xmlns:views="using:HljuML.App.Views"
+             xmlns:controls="using:HljuML.App.Controls"
+             x:Class="HljuML.App.Views.Settings.GameSettingsView"
+             x:DataType="vm:SettingsViewModel">
+    <StackPanel Spacing="{arc:ArcDesignTokenResource Space4}">
+        <controls:PageHeader Title="游戏设置" />
+        <TextBlock Text="作为全局默认，实例自己的配置优先。选项立即保存，文本完成编辑后保存。"
+                   TextWrapping="Wrap"
+                   Foreground="{arc:ArcDesignTokenResource TextSecondary}" />
+        <arc:Card Title="启动选项">
+            <StackPanel Spacing="{arc:ArcDesignTokenResource Space4}">
+                <arc:Select Label="游戏启动后启动器行为"
+                            ItemsSource="{Binding StartOptions}"
+                            SelectedItem="{Binding SelectedStart, Mode=TwoWay}"
+                            HorizontalAlignment="Stretch"
+                            ToolTip.Tip="默认保持不变。游戏进程成功启动后执行；自动关闭时若仍有下载或安装任务，将先最小化，待任务结束后关闭。游戏进程会继续运行。" />
+                <arc:Select Label="游戏窗口大小"
+                            ItemsSource="{Binding WindowOptions}"
+                            SelectedItem="{Binding SelectedWindow, Mode=TwoWay}"
+                            HorizontalAlignment="Stretch"
+                            Description="最大化仅在 Windows 可用；实例窗口配置优先。"
+                            ToolTip.Tip="默认使用游戏及实例的窗口设置。全屏通过游戏参数启用；最大化等待游戏窗口创建后执行系统最大化，仅支持 Windows。" />
+            </StackPanel>
+        </arc:Card>
+        <arc:Card Title="内存分配">
+            <arc:Input Label="游戏可用最大内存（G）"
+                       Text="{Binding Memory, Mode=TwoWay}"
+                       ErrorMessage="{Binding MemoryError}"
+                       Tag="Memory"
+                       LostFocus="OnFieldLostFocus"
+                       Description="默认 4 G，允许 0.25–1024 G；1 G = 1024 MiB。"
+                       ToolTip.Tip="设置 JVM 最大堆内存，可输入小数。请为系统和其他程序保留内存；实例自己的最大内存设置优先，下次启动游戏时生效。" />
+        </arc:Card>
+        <arc:Card Title="环境设置">
+            <arc:Textarea Label="JVM 参数"
+                          Text="{Binding Jvm, Mode=TwoWay}"
+                          ErrorMessage="{Binding JvmError}"
+                          Tag="Jvm"
+                          LostFocus="OnFieldLostFocus"
+                          FrameHeight="{arc:ArcDesignTokenResource Space24}"
+                          Description="每行填写一个参数；内存请使用上方的内存分配设置。"
+                          ToolTip.Tip="高级 Java 启动参数，每行一个，例如 -XX:+UseG1GC。不要填写 -Xmx 或 -Xms；实例自己的 JVM 参数优先，下次启动游戏生效。" />
+        </arc:Card>
+        <views:JavaSettingsView DataContext="{Binding Java}" />
+    </StackPanel>
+</UserControl>

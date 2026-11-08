@@ -7,17 +7,17 @@
     <arc:Card Title="Java 运行环境" Description="选择立即保存，实例配置优先。">
         <StackPanel Spacing="{arc:ArcDesignTokenResource Space4}">
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{arc:ArcDesignTokenResource Space3}">
-            <arc:Select Label="默认 Java 环境"
-                        ToolTip.Tip="作为全局默认，实例自己的 Java 设置优先。可自动匹配版本，或在列表底部手动选择可执行文件；同目录同时有 javaw.exe 和 java.exe 时优先使用 javaw.exe。"
-                        Description="可在列表底部手动选择 javaw.exe 或 java.exe。"
-                        ItemsSource="{Binding JavaOptions}"
-                        SelectedItem="{Binding SelectedJavaOption, Mode=TwoWay}"
-                        IsEnabled="{Binding CanScan}"
-                        SelectionChanged="OnJavaSelectionChanged"
-                        HorizontalAlignment="Stretch" />
-            <arc:Button Grid.Column="1" Content="扫描 Java" Variant="Secondary" IsLoading="{Binding IsScanning}"
-                        IsEnabled="{Binding CanScan}" Click="OnScanJavaClicked" VerticalAlignment="Center"
-                        ToolTip.Tip="刷新本机 Java 列表；每次启动启动器时也会自动扫描。扫描不会删除手动选择的默认 Java。" />
+                <arc:Select Label="默认 Java 环境"
+                            ToolTip.Tip="作为全局默认，实例自己的 Java 设置优先。可自动匹配版本，或在列表底部手动选择可执行文件；同目录同时有 javaw.exe 和 java.exe 时优先使用 javaw.exe。"
+                            Description="可在列表底部手动选择 javaw.exe 或 java.exe。"
+                            ItemsSource="{Binding JavaOptions}"
+                            SelectedItem="{Binding SelectedJavaOption, Mode=TwoWay}"
+                            IsEnabled="{Binding CanScan}"
+                            SelectionChanged="OnJavaSelectionChanged"
+                            HorizontalAlignment="Stretch" />
+                <arc:Button Grid.Column="1" Content="扫描 Java" Variant="Secondary" IsLoading="{Binding IsScanning}"
+                            IsEnabled="{Binding CanScan}" Click="OnScanJavaClicked" VerticalAlignment="Center"
+                            ToolTip.Tip="刷新本机 Java 列表；每次启动启动器时也会自动扫描。扫描不会删除手动选择的默认 Java。" />
             </Grid>
             <TextBlock Text="{Binding SelectedPathDescription}" TextWrapping="Wrap"
                        Foreground="{arc:ArcDesignTokenResource TextSecondary}"

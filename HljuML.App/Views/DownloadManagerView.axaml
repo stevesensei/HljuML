@@ -2,43 +2,23 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:arc="https://github.com/AIDotNet/TKCode.Arc"
              xmlns:vm="using:HljuML.App.Core"
+             xmlns:controls="using:HljuML.App.Controls"
              x:Class="HljuML.App.Views.DownloadManagerView"
              x:DataType="vm:DownloadQueueViewModel">
-    <UserControl.Styles>
-        <Style Selector="TextBlock.download-heading">
-            <Setter Property="Foreground" Value="{arc:ArcDesignTokenResource Foreground}" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-        </Style>
-        <Style Selector="TextBlock.download-secondary">
-            <Setter Property="Foreground" Value="{arc:ArcDesignTokenResource TextSecondary}" />
-            <Setter Property="FontSize" Value="{arc:ArcDesignTokenResource TypeSM}" />
-        </Style>
-    </UserControl.Styles>
-    <UserControl.Resources>
-        <vm:UniformThicknessConverter x:Key="UniformThicknessConverter" />
-    </UserControl.Resources>
-
     <StackPanel Spacing="{arc:ArcDesignTokenResource Space4}">
         <StackPanel Spacing="{arc:ArcDesignTokenResource Space1}">
-            <TextBlock Classes="download-heading" Text="下载管理器"
-                       FontSize="{arc:ArcDesignTokenResource Type3XL}" />
-            <TextBlock Classes="download-secondary" Text="{Binding Summary}"
-                       TextWrapping="Wrap" />
-            <TextBlock Classes="download-secondary" Text="关闭窗口后下载会继续，本次运行的任务结果会保留。"
-                       TextWrapping="Wrap" />
+            <controls:PageHeader Title="下载管理器"
+                                 Description="{Binding Summary}"
+                                 TitleFontSize="{arc:ArcDesignTokenResource Type3XL}" />
+            <TextBlock Classes="app-description" Text="关闭窗口后下载会继续，本次运行的任务结果会保留。" TextWrapping="Wrap" />
         </StackPanel>
-
-        <Border Background="{arc:ArcDesignTokenResource Surface}"
-                BorderBrush="{arc:ArcDesignTokenResource Border}" BorderThickness="1"
-                CornerRadius="{arc:ArcDesignTokenResource RadiusPanel}"
-                IsVisible="{Binding !HasTasks}">
+        <Border Classes="app-panel" IsVisible="{Binding !HasTasks}">
             <arc:EmptyState Title="当前没有下载任务">
                 <arc:EmptyState.Icon>
                     <arc:ArcGlyph Data="{x:Static arc:ArcIcons.Download}" Size="{arc:ArcDesignTokenResource Space6}" />
                 </arc:EmptyState.Icon>
             </arc:EmptyState>
         </Border>
-
         <ItemsControl ItemsSource="{Binding Tasks}">
             <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
@@ -47,32 +27,41 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:DownloadTaskViewModel">
-                    <Border Background="{arc:ArcDesignTokenResource Surface}"
-                            BorderBrush="{arc:ArcDesignTokenResource Border}" BorderThickness="1"
-                            CornerRadius="{arc:ArcDesignTokenResource RadiusPanel}"
+                    <Border Classes="app-panel"
                             Tag="{arc:ArcDesignTokenResource Space5}"
                             Padding="{Binding $self.Tag, Converter={StaticResource UniformThicknessConverter}}">
                         <StackPanel Spacing="{arc:ArcDesignTokenResource Space3}">
                             <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="{arc:ArcDesignTokenResource Space3}">
-                                <arc:ArcGlyph Data="{x:Static arc:ArcIcons.Download}" Size="{arc:ArcDesignTokenResource Space5}"
-                                              Foreground="{arc:ArcDesignTokenResource Accent}" VerticalAlignment="Center" />
-                                <TextBlock Grid.Column="1" Classes="download-heading"
+                                <arc:ArcGlyph Data="{x:Static arc:ArcIcons.Download}"
+                                              Size="{arc:ArcDesignTokenResource Space5}"
+                                              Foreground="{arc:ArcDesignTokenResource Accent}"
+                                              VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1"
+                                           Classes="app-heading"
                                            FontSize="{arc:ArcDesignTokenResource TypeLG}"
-                                           Text="{Binding Name}" TextTrimming="CharacterEllipsis"
+                                           Text="{Binding Name}"
+                                           TextTrimming="CharacterEllipsis"
                                            ToolTip.Tip="{Binding Name}" />
-                                <TextBlock Grid.Column="2" Classes="download-secondary"
-                                           Text="{Binding Status}" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="2"
+                                           Classes="app-description"
+                                           Text="{Binding Status}"
+                                           VerticalAlignment="Center" />
                             </Grid>
-                            <TextBlock Classes="download-secondary" Text="{Binding Phase}" IsVisible="{Binding HasPhase}"
+                            <TextBlock Classes="app-description"
+                                       Text="{Binding Phase}"
+                                       IsVisible="{Binding HasPhase}"
                                        TextWrapping="Wrap" />
-                            <arc:Progress Label="{Binding ProgressLabel}" Maximum="100"
-                                          Value="{Binding ProgressValue, Mode=OneWay}" IsValueVisible="True"
+                            <arc:Progress Label="{Binding ProgressLabel}"
+                                          Maximum="100"
+                                          Value="{Binding ProgressValue, Mode=OneWay}"
+                                          IsValueVisible="True"
                                           IsVisible="{Binding HasProgress}" />
-                            <TextBlock Classes="download-secondary" Text="{Binding Summary}" TextWrapping="Wrap" />
-                            <TextBlock Text="{Binding Error}" IsVisible="{Binding HasError}" TextWrapping="Wrap"
+                            <TextBlock Classes="app-description" Text="{Binding Summary}" TextWrapping="Wrap" />
+                            <TextBlock Text="{Binding Error}"
+                                       IsVisible="{Binding HasError}"
+                                       TextWrapping="Wrap"
                                        FontSize="{arc:ArcDesignTokenResource TypeSM}"
                                        Foreground="{arc:ArcDesignTokenResource Danger}" />
-
                             <ItemsControl ItemsSource="{Binding Files}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
@@ -86,9 +75,12 @@
                                                 Tag="{arc:ArcDesignTokenResource Space3}"
                                                 Padding="{Binding $self.Tag, Converter={StaticResource UniformThicknessConverter}}">
                                             <StackPanel Spacing="{arc:ArcDesignTokenResource Space1}">
-                                                <TextBlock Classes="download-heading" Text="{Binding Name}"
-                                                           TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" />
-                                                <TextBlock Classes="download-secondary" Text="{Binding Summary}"
+                                                <TextBlock Classes="app-heading"
+                                                           Text="{Binding Name}"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           ToolTip.Tip="{Binding Name}" />
+                                                <TextBlock Classes="app-description"
+                                                           Text="{Binding Summary}"
                                                            TextWrapping="Wrap" />
                                             </StackPanel>
                                         </Border>

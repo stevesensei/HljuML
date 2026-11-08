@@ -9,11 +9,12 @@
                    TextWrapping="Wrap" Foreground="{arc:ArcDesignTokenResource TextSecondary}"
                    ToolTip.Tip="最低日志等级在启动器设置中调整。分享日志前请检查个人信息。" />
         <Border Grid.Row="1" x:Name="LogArea">
-        <arc:Textarea x:Name="LogOutput" Label="启动器日志" IsLabelVisible="False" IsReadOnly="True"
-                      IsResizable="False" FrameHeight="{Binding #LogArea.Bounds.Height}"
-                      ToolTip.Tip="可选择和复制日志。每秒自动刷新，完整记录保存在本地日志文件。"
-                      HorizontalAlignment="Stretch" VerticalAlignment="Stretch" TextWrapping="NoWrap"
-                      ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" />
+            <arc:Textarea x:Name="LogOutput" Label="启动器日志" IsLabelVisible="False" IsReadOnly="True"
+                          IsResizable="False" FrameHeight="{Binding #LogArea.Bounds.Height}"
+                          ToolTip.Tip="可选择和复制日志。每秒自动刷新，完整记录保存在本地日志文件。"
+                          HorizontalAlignment="Stretch" VerticalAlignment="Stretch" TextWrapping="NoWrap"
+                          ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                          ScrollViewer.VerticalScrollBarVisibility="Auto" />
         </Border>
     </Grid>
 </Window>

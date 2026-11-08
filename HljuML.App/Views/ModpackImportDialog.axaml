@@ -33,7 +33,8 @@
             <StackPanel Orientation="Horizontal" Spacing="{arc:ArcDesignTokenResource Space2}">
                 <arc:Button Content="重新解析" Variant="Secondary" IsVisible="{Binding CanRetry}" Click="OnRetryClicked" />
                 <arc:Button Content="取消" Variant="Secondary" IsEnabled="{Binding CanDismiss}" Click="OnCancelClicked" />
-                <arc:Button Variant="Primary" IsLoading="{Binding IsSubmitting}" IsEnabled="{Binding CanConfirm}" Click="OnConfirmClicked">
+                <arc:Button Variant="Primary" IsLoading="{Binding IsSubmitting}" IsEnabled="{Binding CanConfirm}"
+                            Click="OnConfirmClicked">
                     <TextBlock Text="开始导入" Foreground="{arc:ArcDesignTokenResource Background}" />
                 </arc:Button>
             </StackPanel>

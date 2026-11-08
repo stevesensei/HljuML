@@ -1,0 +1,30 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:arc="https://github.com/AIDotNet/TKCode.Arc"
+             xmlns:controls="using:HljuML.App.Controls"
+             x:Class="HljuML.App.Controls.DialogHeader"
+             x:Name="HeaderRoot"
+             x:DataType="controls:DialogHeader">
+    <Border Background="{arc:ArcDesignTokenResource AccentSubtle}"
+            Padding="20,12"
+            CornerRadius="{arc:ArcDesignTokenResource RadiusSurface}">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{arc:ArcDesignTokenResource Space3}">
+            <Border Background="Transparent" WindowDecorationProperties.ElementRole="TitleBar">
+                <TextBlock Classes="app-section-heading"
+                           Text="{Binding Title, ElementName=HeaderRoot}"
+                           VerticalAlignment="Center"
+                           IsHitTestVisible="False" />
+            </Border>
+            <arc:Button Grid.Column="1"
+                        Variant="Ghost"
+                        Size="Small"
+                        Click="OnCloseClicked"
+                        AutomationProperties.Name="关闭窗口"
+                        ToolTip.Tip="关闭窗口">
+                <arc:ArcGlyph Size="{arc:ArcDesignTokenResource Space4}"
+                              Data="{StaticResource CloseGlyph}"
+                              IsHitTestVisible="False" />
+            </arc:Button>
+        </Grid>
+    </Border>
+</UserControl>

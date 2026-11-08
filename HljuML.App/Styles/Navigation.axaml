@@ -1,0 +1,13 @@
+<Styles xmlns="https://github.com/avaloniaui" xmlns:arc="https://github.com/AIDotNet/TKCode.Arc">
+    <Style Selector="arc|Button.app-nav">
+        <Setter Property="Variant" Value="Ghost" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="arc|Button.app-nav.active">
+        <Setter Property="Variant" Value="Secondary" />
+    </Style>
+    <Style Selector="arc|Button.app-nav.download-nav">
+        <Setter Property="Size" Value="Small" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    </Style>
+</Styles>

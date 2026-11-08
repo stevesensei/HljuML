@@ -1,10 +1,21 @@
 <Application xmlns="https://github.com/avaloniaui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="HljuML.App.App"
-             RequestedThemeVariant="Default">
-             <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
-
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    x:Class="HljuML.App.App"
+    RequestedThemeVariant="Default">
+    <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="avares://HljuML.App/Resources/LauncherResources.axaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
     <Application.Styles>
         <FluentTheme />
+        <StyleInclude Source="avares://HljuML.App/Styles/Typography.axaml" />
+        <StyleInclude Source="avares://HljuML.App/Styles/Surfaces.axaml" />
+        <StyleInclude Source="avares://HljuML.App/Styles/Navigation.axaml" />
+        <StyleInclude Source="avares://HljuML.App/Styles/Shell.axaml" />
+        <StyleInclude Source="avares://HljuML.App/Styles/ArcCompatibility.axaml" />
     </Application.Styles>
 </Application>

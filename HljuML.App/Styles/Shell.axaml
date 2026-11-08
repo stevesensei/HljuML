@@ -1,0 +1,48 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:arc="https://github.com/AIDotNet/TKCode.Arc">
+    <Style Selector="Border.rounded-window">
+        <Setter Property="CornerRadius" Value="{StaticResource WindowRadius}" />
+    </Style>
+    <Style Selector="Border.instance-icon">
+        <Setter Property="Background" Value="{StaticResource InstanceIconBrush}" />
+        <Setter Property="CornerRadius" Value="{StaticResource InstanceIconRadius}" />
+    </Style>
+    <Style Selector="Border.floating">
+        <Setter Property="Background" Value="{StaticResource PanelBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource GlassEdgeBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{arc:ArcDesignTokenResource RadiusPill}" />
+        <Setter Property="BoxShadow" Value="{arc:ArcDesignTokenResource ShadowRaised}" />
+        <Setter Property="Padding" Value="{StaticResource FloatingPadding}" />
+    </Style>
+    <Style Selector="Border.resize-grip">
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="arc|Button.account-selection">
+        <Setter Property="HorizontalAlignment" Value="Left" />
+    </Style>
+    <Style Selector="arc|Button.instance-selection">
+        <Setter Property="HorizontalAlignment" Value="Right" />
+    </Style>
+    <Style Selector="arc|Avatar.dock-avatar">
+        <Setter Property="Size" Value="Large" />
+    </Style>
+    <Style Selector="Border.compact-dock arc|Button.dock-selection">
+        <Setter Property="Padding" Value="8,0" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="Border.compact-dock arc|Avatar.dock-avatar">
+        <Setter Property="Size" Value="Medium" />
+    </Style>
+    <Style Selector="Border.compact-dock :is(Control).dock-chevron">
+        <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="arc|Button.launch-button.launching">
+        <Setter Property="Variant" Value="Secondary" />
+    </Style>
+    <Style Selector="arc|Button.launch-button.launching TextBlock">
+        <Setter Property="Foreground" Value="{arc:ArcDesignTokenResource Foreground}" />
+    </Style>
+</Styles>

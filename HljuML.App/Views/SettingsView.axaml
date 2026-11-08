@@ -2,155 +2,36 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:arc="https://github.com/AIDotNet/TKCode.Arc"
              xmlns:vm="using:HljuML.App.Core"
-             xmlns:views="using:HljuML.App.Views"
-             x:Class="HljuML.App.Views.SettingsView" x:DataType="vm:SettingsViewModel">
-    <UserControl.Styles>
-        <Style Selector="TextBlock.section-title">
-            <Setter Property="FontSize" Value="{arc:ArcDesignTokenResource Type2XL}" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-        </Style>
-        <Style Selector="arc|Button.settings-nav">
-            <Setter Property="Variant" Value="Ghost" />
-            <Setter Property="HorizontalAlignment" Value="Stretch" />
-        </Style>
-        <Style Selector="arc|Button.settings-nav.active">
-            <Setter Property="Variant" Value="Secondary" />
-        </Style>
-    </UserControl.Styles>
+             xmlns:settings="using:HljuML.App.Views.Settings"
+             x:Class="HljuML.App.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{arc:ArcDesignTokenResource Space4}">
         <StackPanel Spacing="{arc:ArcDesignTokenResource Space2}">
-            <arc:Button Content="游戏设置" Classes="settings-nav" Classes.active="{Binding IsGame}"
-                        Tag="Game" Click="OnSectionClicked" ToolTip.Tip="启动选项、内存分配、JVM 参数及默认 Java 环境。" />
-            <arc:Button Content="启动器设置" Classes="settings-nav" Classes.active="{Binding IsLauncher}"
-                        Tag="Launcher" Click="OnSectionClicked" ToolTip.Tip="下载、在线服务、调试日志与启动器外观。" />
-            <arc:Button Content="关于" Classes="settings-nav" Classes.active="{Binding IsAbout}"
-                        Tag="About" Click="OnSectionClicked" ToolTip.Tip="查看启动器版本、法律声明与开发人员。" />
+            <arc:Button Content="游戏设置"
+                        Classes="app-nav"
+                        Classes.active="{Binding IsGame}"
+                        Tag="Game"
+                        Click="OnSectionClicked"
+                        ToolTip.Tip="启动选项、内存分配、JVM 参数及默认 Java 环境。" />
+            <arc:Button Content="启动器设置"
+                        Classes="app-nav"
+                        Classes.active="{Binding IsLauncher}"
+                        Tag="Launcher"
+                        Click="OnSectionClicked"
+                        ToolTip.Tip="下载、在线服务、调试日志与启动器外观。" />
+            <arc:Button Content="关于"
+                        Classes="app-nav"
+                        Classes.active="{Binding IsAbout}"
+                        Tag="About"
+                        Click="OnSectionClicked"
+                        ToolTip.Tip="查看启动器版本、法律声明与开发人员。" />
         </StackPanel>
         <ScrollViewer x:Name="SettingsScroll" Grid.Column="1" HorizontalScrollBarVisibility="Disabled">
             <StackPanel Spacing="{arc:ArcDesignTokenResource Space4}">
                 <arc:Alert Title="设置未保存" Content="{Binding ErrorMessage}" Tone="Danger" IsVisible="{Binding HasError}" />
-                <StackPanel IsVisible="{Binding IsGame}" Spacing="{arc:ArcDesignTokenResource Space4}">
-                    <TextBlock Classes="section-title" Text="游戏设置" />
-                    <TextBlock Text="作为全局默认，实例自己的配置优先。选项立即保存，文本完成编辑后保存。"
-                               TextWrapping="Wrap" Foreground="{arc:ArcDesignTokenResource TextSecondary}" />
-                    <arc:Card Title="启动选项">
-                        <StackPanel Spacing="{arc:ArcDesignTokenResource Space4}">
-                            <arc:Select Label="游戏启动后启动器行为" ItemsSource="{Binding StartOptions}"
-                                        SelectedItem="{Binding SelectedStart, Mode=TwoWay}" HorizontalAlignment="Stretch"
-                                        ToolTip.Tip="默认保持不变。游戏进程成功启动后执行；自动关闭时若仍有下载或安装任务，将先最小化，待任务结束后关闭。游戏进程会继续运行。" />
-                            <arc:Select Label="游戏窗口大小" ItemsSource="{Binding WindowOptions}"
-                                        SelectedItem="{Binding SelectedWindow, Mode=TwoWay}" HorizontalAlignment="Stretch"
-                                        Description="最大化仅在 Windows 可用；实例窗口配置优先。"
-                                        ToolTip.Tip="默认使用游戏及实例的窗口设置。全屏通过游戏参数启用；最大化等待游戏窗口创建后执行系统最大化，仅支持 Windows。" />
-                        </StackPanel>
-                    </arc:Card>
-                    <arc:Card Title="内存分配">
-                        <arc:Input Label="游戏可用最大内存（G）" Text="{Binding Memory, Mode=TwoWay}"
-                                   ErrorMessage="{Binding MemoryError}" Tag="Memory" LostFocus="OnFieldLostFocus"
-                                   Description="默认 4 G，允许 0.25–1024 G；1 G = 1024 MiB。"
-                                   ToolTip.Tip="设置 JVM 最大堆内存，可输入小数。请为系统和其他程序保留内存；实例自己的最大内存设置优先，下次启动游戏时生效。" />
-                    </arc:Card>
-                    <arc:Card Title="环境设置">
-                        <arc:Textarea Label="JVM 参数" Text="{Binding Jvm, Mode=TwoWay}"
-                                      ErrorMessage="{Binding JvmError}" Tag="Jvm" LostFocus="OnFieldLostFocus"
-                                      FrameHeight="{arc:ArcDesignTokenResource Space24}"
-                                      Description="每行填写一个参数；内存请使用上方的内存分配设置。"
-                                      ToolTip.Tip="高级 Java 启动参数，每行一个，例如 -XX:+UseG1GC。不要填写 -Xmx 或 -Xms；实例自己的 JVM 参数优先，下次启动游戏生效。" />
-                    </arc:Card>
-                    <views:JavaSettingsView DataContext="{Binding Java}" />
-                </StackPanel>
-                <StackPanel IsVisible="{Binding IsLauncher}" Spacing="{arc:ArcDesignTokenResource Space4}">
-                    <TextBlock Classes="section-title" Text="启动器设置" />
-                    <arc:Card Title="下载">
-                        <StackPanel Spacing="{arc:ArcDesignTokenResource Space4}">
-                            <arc:Select Label="Minecraft 相关资源下载源" ItemsSource="{Binding SourceOptions}"
-                                        SelectedItem="{Binding SelectedSource, Mode=TwoWay}" HorizontalAlignment="Stretch"
-                                        ToolTip.Tip="官方：直接访问原始资源服务器。BMCL API：使用镜像提供的 Minecraft 及加载器资源。影响后续请求，已开始的文件继续下载。默认 BMCL API。" />
-                            <arc:Select Label="社区资源下载源" ItemsSource="{Binding CommunityOptions}"
-                                        SelectedItem="{Binding SelectedCommunity, Mode=TwoWay}" HorizontalAlignment="Stretch"
-                                        Description="MCIM 为占位选项，暂不可用。"
-                                        ToolTip.Tip="社区资源当前使用官方地址。MCIM 镜像接入尚未实现，不能选择，不会改变整合包声明的下载地址。" />
-                            <arc:Input Label="下载线程数" Text="{Binding Threads, Mode=TwoWay}" Tag="Threads"
-                                       ErrorMessage="{Binding ThreadsError}" LostFocus="OnFieldLostFocus"
-                                       Description="默认 64，范围 1–128。"
-                                       ToolTip.Tip="限制同时进行的文件下载数量。降低时等待已开始的文件结束；ColorMC 工作线程在空闲后调整。过高可能增加服务器压力。" />
-                            <arc:Input Label="下载限速（M/s）" Text="{Binding Limit, Mode=TwoWay}" Tag="Limit"
-                                       ErrorMessage="{Binding LimitError}" LostFocus="OnFieldLostFocus"
-                                       Description="0 表示不限速；支持小数，1 M/s = 1,000,000 字节/秒。"
-                                       ToolTip.Tip="ColorMC 资源、整合包文件及 Java 安装包共用总带宽限制，修改后立即生效。元数据小请求不计入限速。默认不限速。" />
-                        </StackPanel>
-                    </arc:Card>
-                    <arc:Card Title="在线服务">
-                        <StackPanel Spacing="{arc:ArcDesignTokenResource Space4}">
-                            <arc:Input Label="在线服务元数据地址" Text="由服务器定制（占位）" IsReadOnly="True"
-                                       Description="该字段由服务器定制，请不要随便修改。"
-                                       ToolTip.Tip="在线服务元数据接口暂未接入，此处只读占位；不会向此地址发送请求。" />
-                            <arc:Input Label="MUA 组织 ID" Text="{Binding Mua, Mode=TwoWay}" Tag="Mua"
-                                       ErrorMessage="{Binding MuaError}" LostFocus="OnFieldLostFocus" MaxLength="256"
-                                       Description="目前只保存到本机，等待组织服务接入。"
-                                       ToolTip.Tip="填写组织提供的 MUA 组织标识，最多 256 个字符。留空表示未配置；当前版本仅保存，不会发起组织服务请求。" />
-                        </StackPanel>
-                    </arc:Card>
-                    <arc:Card Title="高级选项">
-                        <StackPanel Spacing="{arc:ArcDesignTokenResource Space4}">
-                            <arc:Switch Content="调试模式" IsChecked="{Binding DebugMode, Mode=TwoWay}"
-                                        ToolTip.Tip="立即生效。在顶栏显示“输出日志”入口，可查看当前会话最近 1000 条启动器日志。关闭调试模式仍会按最低等级写入日志文件。" />
-                            <arc:Select Label="输出日志最低等级" ItemsSource="{Binding LogLevelOptions}"
-                                        SelectedItem="{Binding SelectedLogLevel, Mode=TwoWay}" HorizontalAlignment="Stretch"
-                                        ToolTip.Tip="默认 Information。按 Trace、Debug、Information、Warning、Error、Critical 递增，只记录所选及更高等级。Trace 和 Debug 会产生更多日志。" />
-                        </StackPanel>
-                    </arc:Card>
-                    <arc:Card Title="外观">
-                        <StackPanel Spacing="{arc:ArcDesignTokenResource Space4}">
-                            <arc:Select Label="背景" ItemsSource="{Binding BackgroundOptions}"
-                                        SelectedItem="{Binding SelectedBackground, Mode=TwoWay}" HorizontalAlignment="Stretch"
-                                        ToolTip.Tip="默认使用天蓝渐变。随机图片从 HljuML/custom/images 读取；每次启动或切换到随机图片时选择一张，空目录或图片无效时回退默认背景。" />
-                            <SelectableTextBlock Text="{Binding ImagesDirectory}" TextWrapping="Wrap"
-                                                 ToolTip.Tip="将 PNG、JPEG、WebP 或 BMP 图片放入此目录；单张不超过 32 MB。目录会自动创建。" />
-                            <TextBlock Text="{Binding BackgroundStatus}" TextWrapping="Wrap" Foreground="{arc:ArcDesignTokenResource TextSecondary}" />
-                            <arc:Select Label="配色" ItemsSource="{Binding ColorOptions}" SelectedItem="{Binding SelectedColor, Mode=OneWay}"
-                                        HorizontalAlignment="Stretch" Description="绿叶配色为占位选项。"
-                                        ToolTip.Tip="当前使用天蓝配色。绿叶配色尚未实现，暂时不可选择。" />
-                        </StackPanel>
-                    </arc:Card>
-                </StackPanel>
-                <StackPanel IsVisible="{Binding IsAbout}" Spacing="{arc:ArcDesignTokenResource Space4}">
-                    <TextBlock Classes="section-title" Text="关于" />
-                    <arc:Card Title="HljuML" Description="介绍待补充。">
-                        <StackPanel Spacing="{arc:ArcDesignTokenResource Space2}">
-                            <TextBlock Text="{Binding HljuMLVersion, StringFormat='HljuML 版本：{0}'}"
-                                       ToolTip.Tip="启动器版本" />
-                            <TextBlock Text="{Binding ColorMCVersion, StringFormat='ColorMC 版本：{0}'}"
-                                       ToolTip.Tip="底层核心版本" />
-                        </StackPanel>
-                    </arc:Card>
-                    <arc:Card Title="法律信息">
-                        <StackPanel Spacing="{arc:ArcDesignTokenResource Space4}">
-                            <TextBlock Text="HljuML 是独立项目，与 Mojang Studios、Microsoft 没有隶属或认可关系。Minecraft 名称及相关商标归其权利人所有。" TextWrapping="Wrap" />
-                            <TextBlock Text="启动器在本机保存账户档案、设置和运行日志；登录与下载会连接对应认证服务器和资源提供方。请妥善保管本地数据，分享日志前检查其中的个人信息。" TextWrapping="Wrap" />
-                        </StackPanel>
-                    </arc:Card>
-                    <arc:Card Title="开发人员" Description="感谢所有为HljuML做出贡献的开发者(包括ChatGPT小姐)">
-                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="{arc:ArcDesignTokenResource Space3}">
-                            <arc:Avatar DisplayName="stevesensei" Size="Large" VerticalAlignment="Center"
-                                        Source="avares://HljuML.App/Assets/Dever/stevesensei.png"
-                                        AutomationProperties.Name="头像" />
-                            <StackPanel Grid.Column="1" Spacing="{arc:ArcDesignTokenResource Space1}"
-                                        VerticalAlignment="Center">
-                                <TextBlock Text="stevesensei" FontSize="{arc:ArcDesignTokenResource TypeBase}"
-                                           Foreground="{arc:ArcDesignTokenResource Foreground}" />
-                                <TextBlock Text="El Psy Congroo." TextWrapping="Wrap"
-                                           FontSize="{arc:ArcDesignTokenResource TypeSM}"
-                                           Foreground="{arc:ArcDesignTokenResource TextSecondary}" />
-                            </StackPanel>
-                            <arc:Button Grid.Column="2" Content="GitHub" Variant="Secondary"
-                                        MinWidth="{arc:ArcDesignTokenResource Space24}" VerticalAlignment="Center"
-                                        BorderBrush="{arc:ArcDesignTokenResource Accent}"
-                                        Foreground="{arc:ArcDesignTokenResource Accent}"
-                                        Click="OnDeveloperClicked" ToolTip.Tip="在默认浏览器中打开开发者 GitHub 主页" />
-                        </Grid>
-                    </arc:Card>
-                </StackPanel>
+                <settings:GameSettingsView IsVisible="{Binding IsGame}" />
+                <settings:LauncherSettingsView IsVisible="{Binding IsLauncher}" />
+                <settings:AboutSettingsView IsVisible="{Binding IsAbout}" />
             </StackPanel>
         </ScrollViewer>
     </Grid>

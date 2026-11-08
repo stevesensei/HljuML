@@ -1,0 +1,90 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:arc="https://github.com/AIDotNet/TKCode.Arc"
+             xmlns:vm="using:HljuML.App.Core"
+             xmlns:controls="using:HljuML.App.Controls"
+             x:Class="HljuML.App.Views.Settings.LauncherSettingsView"
+             x:DataType="vm:SettingsViewModel">
+    <StackPanel Spacing="{arc:ArcDesignTokenResource Space4}">
+        <controls:PageHeader Title="启动器设置" />
+        <arc:Card Title="下载">
+            <StackPanel Spacing="{arc:ArcDesignTokenResource Space4}">
+                <arc:Select Label="Minecraft 相关资源下载源"
+                            ItemsSource="{Binding SourceOptions}"
+                            SelectedItem="{Binding SelectedSource, Mode=TwoWay}"
+                            HorizontalAlignment="Stretch"
+                            ToolTip.Tip="官方：直接访问原始资源服务器。BMCL API：使用镜像提供的 Minecraft 及加载器资源。影响后续请求，已开始的文件继续下载。默认 BMCL API。" />
+                <arc:Select Label="社区资源下载源"
+                            ItemsSource="{Binding CommunityOptions}"
+                            SelectedItem="{Binding SelectedCommunity, Mode=TwoWay}"
+                            HorizontalAlignment="Stretch"
+                            Description="MCIM 为占位选项，暂不可用。"
+                            ToolTip.Tip="社区资源当前使用官方地址。MCIM 镜像接入尚未实现，不能选择，不会改变整合包声明的下载地址。" />
+                <arc:Input Label="下载线程数"
+                           Text="{Binding Threads, Mode=TwoWay}"
+                           Tag="Threads"
+                           ErrorMessage="{Binding ThreadsError}"
+                           LostFocus="OnFieldLostFocus"
+                           Description="默认 64，范围 1–128。"
+                           ToolTip.Tip="限制同时进行的文件下载数量。降低时等待已开始的文件结束；ColorMC 工作线程在空闲后调整。过高可能增加服务器压力。" />
+                <arc:Input Label="下载限速（M/s）"
+                           Text="{Binding Limit, Mode=TwoWay}"
+                           Tag="Limit"
+                           ErrorMessage="{Binding LimitError}"
+                           LostFocus="OnFieldLostFocus"
+                           Description="0 表示不限速；支持小数，1 M/s = 1,000,000 字节/秒。"
+                           ToolTip.Tip="ColorMC 资源、整合包文件及 Java 安装包共用总带宽限制，修改后立即生效。元数据小请求不计入限速。默认不限速。" />
+            </StackPanel>
+        </arc:Card>
+        <arc:Card Title="在线服务">
+            <StackPanel Spacing="{arc:ArcDesignTokenResource Space4}">
+                <arc:Input Label="在线服务元数据地址"
+                           Text="由服务器定制（占位）"
+                           IsReadOnly="True"
+                           Description="该字段由服务器定制，请不要随便修改。"
+                           ToolTip.Tip="在线服务元数据接口暂未接入，此处只读占位；不会向此地址发送请求。" />
+                <arc:Input Label="MUA 组织 ID"
+                           Text="{Binding Mua, Mode=TwoWay}"
+                           Tag="Mua"
+                           ErrorMessage="{Binding MuaError}"
+                           LostFocus="OnFieldLostFocus"
+                           MaxLength="256"
+                           Description="目前只保存到本机，等待组织服务接入。"
+                           ToolTip.Tip="填写组织提供的 MUA 组织标识，最多 256 个字符。留空表示未配置；当前版本仅保存，不会发起组织服务请求。" />
+            </StackPanel>
+        </arc:Card>
+        <arc:Card Title="高级选项">
+            <StackPanel Spacing="{arc:ArcDesignTokenResource Space4}">
+                <arc:Switch Content="调试模式"
+                            IsChecked="{Binding DebugMode, Mode=TwoWay}"
+                            ToolTip.Tip="立即生效。在顶栏显示“输出日志”入口，可查看当前会话最近 1000 条启动器日志。关闭调试模式仍会按最低等级写入日志文件。" />
+                <arc:Select Label="输出日志最低等级"
+                            ItemsSource="{Binding LogLevelOptions}"
+                            SelectedItem="{Binding SelectedLogLevel, Mode=TwoWay}"
+                            HorizontalAlignment="Stretch"
+                            ToolTip.Tip="默认 Information。按 Trace、Debug、Information、Warning、Error、Critical 递增，只记录所选及更高等级。Trace 和 Debug 会产生更多日志。" />
+            </StackPanel>
+        </arc:Card>
+        <arc:Card Title="外观">
+            <StackPanel Spacing="{arc:ArcDesignTokenResource Space4}">
+                <arc:Select Label="背景"
+                            ItemsSource="{Binding BackgroundOptions}"
+                            SelectedItem="{Binding SelectedBackground, Mode=TwoWay}"
+                            HorizontalAlignment="Stretch"
+                            ToolTip.Tip="默认使用天蓝渐变。随机图片从 HljuML/custom/images 读取；每次启动或切换到随机图片时选择一张，空目录或图片无效时回退默认背景。" />
+                <SelectableTextBlock Text="{Binding ImagesDirectory}"
+                                     TextWrapping="Wrap"
+                                     ToolTip.Tip="将 PNG、JPEG、WebP 或 BMP 图片放入此目录；单张不超过 32 MB。目录会自动创建。" />
+                <TextBlock Text="{Binding BackgroundStatus}"
+                           TextWrapping="Wrap"
+                           Foreground="{arc:ArcDesignTokenResource TextSecondary}" />
+                <arc:Select Label="配色"
+                            ItemsSource="{Binding ColorOptions}"
+                            SelectedItem="{Binding SelectedColor, Mode=OneWay}"
+                            HorizontalAlignment="Stretch"
+                            Description="绿叶配色为占位选项。"
+                            ToolTip.Tip="当前使用天蓝配色。绿叶配色尚未实现，暂时不可选择。" />
+            </StackPanel>
+        </arc:Card>
+    </StackPanel>
+</UserControl>

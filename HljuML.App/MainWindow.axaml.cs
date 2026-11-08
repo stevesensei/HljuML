@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Avalonia;
-using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Input;
@@ -14,7 +13,6 @@ using HljuML.Core.Infrastructure.Downloads;
 using HljuML.Shared.Model;
 using Microsoft.Extensions.DependencyInjection;
 using TKCode.Arc;
-using ArcButton = TKCode.Arc.Button;
 
 namespace HljuML.App;
 
@@ -52,7 +50,7 @@ public partial class MainWindow : Window
         _downloads.TaskCreated += OnDownloadTaskCreated;
     }
 
-    public IList<Control> HomeCards => HomeFeed.Children;
+    public IList<Control> HomeCards => HomePage.Cards;
 
     protected override async void OnOpened(EventArgs e)
     {
@@ -83,11 +81,11 @@ public partial class MainWindow : Window
         base.OnClosed(e);
     }
 
-    private void OnHomeClicked(object? sender, RoutedEventArgs e) => ShowPage(HomePage, HomeButton);
+    private void OnHomeClicked(object? sender, RoutedEventArgs e) => ShowPage(HomePage, "Home");
 
     private void OnDownloadsClicked(object? sender, RoutedEventArgs e)
     {
-        ShowPage(DownloadsPage, DownloadsButton);
+        ShowPage(DownloadsPage, "Downloads");
     }
 
     private void OnDownloadsTick(object? sender, EventArgs e)
@@ -142,15 +140,9 @@ public partial class MainWindow : Window
         RefreshDownloads();
     }
 
-    private void OnLaunchDockSizeChanged(object? sender, SizeChangedEventArgs e)
-    {
-        if (sender is Border dock)
-            dock.Classes.Set("compact-dock", e.NewSize.Width < 600);
-    }
+    private void OnSettingsClicked(object? sender, RoutedEventArgs e) => ShowPage(SettingsPage, "Settings");
 
-    private void OnSettingsClicked(object? sender, RoutedEventArgs e) => ShowPage(SettingsPage, SettingsButton);
-
-    private void ShowPage(Control page, ArcButton activeButton)
+    private void ShowPage(Control page, string activePage)
     {
         if (page.IsVisible)
         {
@@ -161,9 +153,7 @@ public partial class MainWindow : Window
         DownloadsPage.IsVisible = page == DownloadsPage;
         SettingsPage.IsVisible = page == SettingsPage;
         PageScroll.IsVisible = page == HomePage;
-        HomeButton.Variant = activeButton == HomeButton ? ButtonVariant.Secondary : ButtonVariant.Ghost;
-        DownloadsButton.Variant = activeButton == DownloadsButton ? ButtonVariant.Secondary : ButtonVariant.Ghost;
-        SettingsButton.Variant = activeButton == SettingsButton ? ButtonVariant.Secondary : ButtonVariant.Ghost;
+        TitleBar.SetActivePage(activePage);
         PageScroll.Offset = default;
     }
 
@@ -230,11 +220,7 @@ public partial class MainWindow : Window
         var maximized = WindowState == WindowState.Maximized;
         ResizeGrips.IsVisible = WindowState == WindowState.Normal;
         WindowFrame.Classes.Set("rounded-window", WindowState == WindowState.Normal);
-        MaximizeIcon.IsVisible = !maximized;
-        RestoreIcon.IsVisible = maximized;
-        var action = maximized ? "还原窗口" : "最大化";
-        AutomationProperties.SetName(MaximizeButton, action);
-        ToolTip.SetTip(MaximizeButton, action);
+        TitleBar.SetMaximized(maximized);
     }
 
     private async void OnLaunchClicked(object? sender, RoutedEventArgs e)
@@ -256,16 +242,4 @@ public partial class MainWindow : Window
         return selected == profileId && accounts.ReauthenticatedProfileId == profileId;
     }
 
-    private void OnStopInstanceClicked(object? sender, RoutedEventArgs e)
-    {
-        if (sender is not ArcButton { DataContext: RunningInstanceRow row } button ||
-            DataContext is not MainViewModel viewModel)
-        {
-            return;
-        }
-
-        var result = viewModel.StopGameInstance(row.Instance);
-        button.Content = result.Status == ServiceStatus.Success ? "结束中…" : "结束失败";
-        ToolTip.SetTip(button, result.Message);
-    }
 }

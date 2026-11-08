@@ -1,0 +1,21 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:arc="https://github.com/AIDotNet/TKCode.Arc"
+             xmlns:controls="using:HljuML.App.Controls"
+             x:Class="HljuML.App.Controls.PageHeader"
+             x:Name="HeaderRoot"
+             x:DataType="controls:PageHeader">
+    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{arc:ArcDesignTokenResource Space3}">
+        <StackPanel Spacing="{arc:ArcDesignTokenResource Space1}">
+            <TextBlock Classes="app-heading"
+                       Text="{Binding Title, ElementName=HeaderRoot}"
+                       FontSize="{Binding TitleFontSize, ElementName=HeaderRoot}"
+                       TextWrapping="Wrap" />
+            <TextBlock Classes="app-description"
+                       Text="{Binding Description, ElementName=HeaderRoot}"
+                       IsVisible="{Binding HasDescription, ElementName=HeaderRoot}"
+                       TextWrapping="Wrap" />
+        </StackPanel>
+        <ContentControl Grid.Column="1" Content="{Binding Actions, ElementName=HeaderRoot}" VerticalAlignment="Center" />
+    </Grid>
+</UserControl>

@@ -7,7 +7,6 @@
              x:DataType="vm:DownloadHubViewModel"
              SizeChanged="OnHubSizeChanged">
     <UserControl.Resources>
-        <vm:UniformThicknessConverter x:Key="UniformThicknessConverter" />
         <StreamGeometry x:Key="GameGlyph">M5,8 H19 L21,12 L19,16 H5 L3,12 Z M8,11 V13 M6,12 H10 M15,11 H17</StreamGeometry>
         <StreamGeometry x:Key="ModGlyph">M9,3 H15 V7 H19 V11 H15 V15 H11 V19 H7 V15 H3 V9 H7 V5 H9 Z</StreamGeometry>
         <StreamGeometry x:Key="PackGlyph">M4,7 L12,3 L20,7 L12,11 Z M4,7 V17 L12,21 L20,17 V7 M12,11 V21</StreamGeometry>
@@ -16,15 +15,6 @@
         <StreamGeometry x:Key="ShaderGlyph">M12,3 A9,9 0 1 0 12,21 A9,9 0 0 0 12,3 M12,3 V21 M3,12 H21</StreamGeometry>
     </UserControl.Resources>
     <UserControl.Styles>
-        <Style Selector="arc|Button.nav-item">
-            <Setter Property="Variant" Value="Ghost" />
-            <Setter Property="Size" Value="Small" />
-            <Setter Property="HorizontalAlignment" Value="Stretch" />
-            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-        </Style>
-        <Style Selector="arc|Button.nav-item.active">
-            <Setter Property="Variant" Value="Secondary" />
-        </Style>
         <Style Selector="Border.sidebar">
             <Setter Property="MinWidth" Value="{arc:ArcDesignTokenResource Space24}" />
         </Style>
@@ -37,60 +27,88 @@
         <Style Selector="UserControl.compact TextBlock.nav-group">
             <Setter Property="IsVisible" Value="False" />
         </Style>
-        <Style Selector="UserControl.compact arc|Button.nav-item">
+        <Style Selector="UserControl.compact arc|Button.app-nav">
             <Setter Property="HorizontalContentAlignment" Value="Center" />
             <Setter Property="Padding" Value="0" />
         </Style>
     </UserControl.Styles>
-    <Grid ColumnDefinitions="Auto,Auto,*"
-          ColumnSpacing="{arc:ArcDesignTokenResource Space2}">
-        <Border Classes="sidebar" Background="{arc:ArcDesignTokenResource Surface}"
+    <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="{arc:ArcDesignTokenResource Space2}">
+        <Border Classes="sidebar"
+                Background="{arc:ArcDesignTokenResource Surface}"
                 CornerRadius="{arc:ArcDesignTokenResource RadiusPanel}">
             <StackPanel Tag="{arc:ArcDesignTokenResource Space3}"
                         Margin="{Binding $self.Tag, Converter={StaticResource UniformThicknessConverter}}"
                         Spacing="{arc:ArcDesignTokenResource Space1}">
-                <TextBlock Classes="nav-group" Text="游戏" FontSize="{arc:ArcDesignTokenResource TypeXS}"
+                <TextBlock Classes="nav-group"
+                           Text="游戏"
+                           FontSize="{arc:ArcDesignTokenResource TypeXS}"
                            Foreground="{arc:ArcDesignTokenResource TextSecondary}" />
-                <arc:Button Classes.active="{Binding IsVanilla}" Classes="nav-item" Tag="Vanilla"
-                            Click="OnNavigationClicked" AutomationProperties.Name="原版游戏" ToolTip.Tip="原版游戏">
+                <arc:Button Classes.active="{Binding IsVanilla}"
+                            Classes="app-nav download-nav"
+                            Tag="Vanilla"
+                            Click="OnNavigationClicked"
+                            AutomationProperties.Name="原版游戏"
+                            ToolTip.Tip="原版游戏">
                     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{arc:ArcDesignTokenResource Space2}">
                         <arc:ArcGlyph Data="{StaticResource GameGlyph}" Size="{arc:ArcDesignTokenResource Space4}" />
                         <TextBlock Grid.Column="1" Classes="nav-label" Text="原版游戏" VerticalAlignment="Center" />
                     </Grid>
                 </arc:Button>
                 <Separator Background="{arc:ArcDesignTokenResource BorderSubtle}" />
-                <TextBlock Classes="nav-group" Text="社区资源" FontSize="{arc:ArcDesignTokenResource TypeXS}"
+                <TextBlock Classes="nav-group"
+                           Text="社区资源"
+                           FontSize="{arc:ArcDesignTokenResource TypeXS}"
                            Foreground="{arc:ArcDesignTokenResource TextSecondary}" />
-                <arc:Button Classes.active="{Binding IsMods}" Classes="nav-item" Tag="Mods"
-                            Click="OnNavigationClicked" AutomationProperties.Name="Mod" ToolTip.Tip="Mod">
+                <arc:Button Classes.active="{Binding IsMods}"
+                            Classes="app-nav download-nav"
+                            Tag="Mods"
+                            Click="OnNavigationClicked"
+                            AutomationProperties.Name="Mod"
+                            ToolTip.Tip="Mod">
                     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{arc:ArcDesignTokenResource Space2}">
                         <arc:ArcGlyph Data="{StaticResource ModGlyph}" Size="{arc:ArcDesignTokenResource Space4}" />
                         <TextBlock Grid.Column="1" Classes="nav-label" Text="Mod" />
                     </Grid>
                 </arc:Button>
-                <arc:Button Classes.active="{Binding IsModpacks}" Classes="nav-item" Tag="Modpacks"
-                            Click="OnNavigationClicked" AutomationProperties.Name="整合包" ToolTip.Tip="整合包">
+                <arc:Button Classes.active="{Binding IsModpacks}"
+                            Classes="app-nav download-nav"
+                            Tag="Modpacks"
+                            Click="OnNavigationClicked"
+                            AutomationProperties.Name="整合包"
+                            ToolTip.Tip="整合包">
                     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{arc:ArcDesignTokenResource Space2}">
                         <arc:ArcGlyph Data="{StaticResource PackGlyph}" Size="{arc:ArcDesignTokenResource Space4}" />
                         <TextBlock Grid.Column="1" Classes="nav-label" Text="整合包" />
                     </Grid>
                 </arc:Button>
-                <arc:Button Classes.active="{Binding IsDataPacks}" Classes="nav-item" Tag="DataPacks"
-                            Click="OnNavigationClicked" AutomationProperties.Name="数据包" ToolTip.Tip="数据包">
+                <arc:Button Classes.active="{Binding IsDataPacks}"
+                            Classes="app-nav download-nav"
+                            Tag="DataPacks"
+                            Click="OnNavigationClicked"
+                            AutomationProperties.Name="数据包"
+                            ToolTip.Tip="数据包">
                     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{arc:ArcDesignTokenResource Space2}">
                         <arc:ArcGlyph Data="{StaticResource DataGlyph}" Size="{arc:ArcDesignTokenResource Space4}" />
                         <TextBlock Grid.Column="1" Classes="nav-label" Text="数据包" />
                     </Grid>
                 </arc:Button>
-                <arc:Button Classes.active="{Binding IsResourcePacks}" Classes="nav-item" Tag="ResourcePacks"
-                            Click="OnNavigationClicked" AutomationProperties.Name="资源包" ToolTip.Tip="资源包">
+                <arc:Button Classes.active="{Binding IsResourcePacks}"
+                            Classes="app-nav download-nav"
+                            Tag="ResourcePacks"
+                            Click="OnNavigationClicked"
+                            AutomationProperties.Name="资源包"
+                            ToolTip.Tip="资源包">
                     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{arc:ArcDesignTokenResource Space2}">
                         <arc:ArcGlyph Data="{StaticResource ResourceGlyph}" Size="{arc:ArcDesignTokenResource Space4}" />
                         <TextBlock Grid.Column="1" Classes="nav-label" Text="资源包" />
                     </Grid>
                 </arc:Button>
-                <arc:Button Classes.active="{Binding IsShaders}" Classes="nav-item" Tag="Shaders"
-                            Click="OnNavigationClicked" AutomationProperties.Name="光影包" ToolTip.Tip="光影包">
+                <arc:Button Classes.active="{Binding IsShaders}"
+                            Classes="app-nav download-nav"
+                            Tag="Shaders"
+                            Click="OnNavigationClicked"
+                            AutomationProperties.Name="光影包"
+                            ToolTip.Tip="光影包">
                     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{arc:ArcDesignTokenResource Space2}">
                         <arc:ArcGlyph Data="{StaticResource ShaderGlyph}" Size="{arc:ArcDesignTokenResource Space4}" />
                         <TextBlock Grid.Column="1" Classes="nav-label" Text="光影包" />

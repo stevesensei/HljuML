@@ -1,14 +1,15 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:arc="https://github.com/AIDotNet/TKCode.Arc"
-        xmlns:vm="using:HljuML.App.Core"
         xmlns:views="using:HljuML.App.Views"
         x:Class="HljuML.App.Views.DownloadManagerWindow"
-        Title="下载管理器 · HljuML" Width="820" Height="600" MinWidth="480" MinHeight="360"
-        WindowStartupLocation="CenterOwner" Background="{arc:ArcDesignTokenResource Background}">
-    <Window.Resources>
-        <vm:UniformThicknessConverter x:Key="UniformThicknessConverter" />
-    </Window.Resources>
+        Title="下载管理器 · HljuML"
+        Width="820"
+        Height="600"
+        MinWidth="480"
+        MinHeight="360"
+        WindowStartupLocation="CenterOwner"
+        Background="{arc:ArcDesignTokenResource Background}">
     <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
         <views:DownloadManagerView Tag="{arc:ArcDesignTokenResource Space6}"
                                    Margin="{Binding $self.Tag, Converter={StaticResource UniformThicknessConverter}}" />

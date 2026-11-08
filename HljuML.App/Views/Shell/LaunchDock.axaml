@@ -1,0 +1,94 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:arc="https://github.com/AIDotNet/TKCode.Arc"
+             xmlns:vm="using:HljuML.App.Core"
+             x:Class="HljuML.App.Views.Shell.LaunchDock"
+             x:DataType="vm:MainViewModel">
+    <Border Classes="floating" SizeChanged="OnLaunchDockSizeChanged">
+        <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="{arc:ArcDesignTokenResource Space3}">
+            <arc:Button x:Name="AccountButton"
+                        Classes="dock-selection account-selection"
+                        Variant="Ghost"
+                        Size="Large"
+                        Click="OnAccountClicked"
+                        VerticalAlignment="Center"
+                        IsEnabled="{Binding CanChangeLaunchSelection}"
+                        AutomationProperties.Name="打开账户管理"
+                        ToolTip.Tip="账户管理">
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="{arc:ArcDesignTokenResource Space3}">
+                    <arc:Avatar Classes="dock-avatar"
+                                VerticalAlignment="Center"
+                                CornerRadius="{arc:ArcDesignTokenResource RadiusStep8}"
+                                DisplayName="{Binding PlayerName, FallbackValue='选择玩家'}"
+                                Source="{Binding PlayerAvatar, FallbackValue='avares://HljuML.App/Assets/player-placeholder.png'}" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                        <TextBlock Classes="app-heading"
+                                   Text="{Binding PlayerName, FallbackValue='选择玩家'}"
+                                   TextTrimming="CharacterEllipsis" />
+                        <TextBlock Classes="app-description"
+                                   Text="{Binding AuthenticationMethod, FallbackValue='未选择档案'}"
+                                   TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                    <arc:ArcGlyph Grid.Column="2"
+                                  Classes="dock-chevron"
+                                  Size="14"
+                                  VerticalAlignment="Center"
+                                  IsHitTestVisible="False"
+                                  Data="M 6,9 L 12,15 L 18,9" />
+                </Grid>
+            </arc:Button>
+            <arc:Button Grid.Column="1"
+                        Classes="dock-selection instance-selection"
+                        Variant="Ghost"
+                        Size="Medium"
+                        VerticalAlignment="Center"
+                        Click="OnChooseInstanceClicked"
+                        IsEnabled="{Binding CanChangeLaunchSelection}"
+                        AutomationProperties.Name="选择游戏实例"
+                        ToolTip.Tip="{Binding InstanceName}">
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="{arc:ArcDesignTokenResource Space2}">
+                    <Border Classes="instance-icon" Width="36" Height="36" IsVisible="{Binding HasSelectedInstance}" />
+                    <TextBlock Grid.Column="1"
+                               Classes="app-heading"
+                               Text="{Binding InstanceName, FallbackValue='选择实例'}"
+                               MaxWidth="128"
+                               VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis" />
+                    <Border Grid.Column="2" Classes="dock-chevron">
+                        <arc:ArcGlyph Size="14"
+                                      VerticalAlignment="Center"
+                                      IsHitTestVisible="False"
+                                      IsVisible="{Binding HasSelectedInstance}"
+                                      Data="M 6,9 L 12,15 L 18,9" />
+                    </Border>
+                </Grid>
+            </arc:Button>
+            <arc:Button x:Name="LaunchButton"
+                        Grid.Column="2"
+                        Classes="launch-button"
+                        Classes.launching="{Binding IsLaunching}"
+                        VerticalAlignment="Center"
+                        MinWidth="112"
+                        MaxWidth="160"
+                        Size="Medium"
+                        Click="OnLaunchClicked"
+                        IsEnabled="{Binding CanLaunchGame, FallbackValue=False}"
+                        AutomationProperties.Name="{Binding LaunchLabel, FallbackValue='启动游戏'}"
+                        ToolTip.Tip="{Binding LaunchStatus}">
+                <StackPanel MaxWidth="128" Spacing="{arc:ArcDesignTokenResource Space1}">
+                    <TextBlock Text="{Binding LaunchLabel, FallbackValue='启动游戏'}"
+                               TextAlignment="Center"
+                               TextWrapping="Wrap"
+                               MaxLines="2"
+                               TextTrimming="CharacterEllipsis"
+                               AutomationProperties.LiveSetting="Polite" />
+                    <TextBlock Text="{Binding LaunchDetail}"
+                               IsVisible="{Binding HasLaunchDetail}"
+                               FontSize="{arc:ArcDesignTokenResource TypeXS}"
+                               TextAlignment="Center"
+                               TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+            </arc:Button>
+        </Grid>
+    </Border>
+</UserControl>

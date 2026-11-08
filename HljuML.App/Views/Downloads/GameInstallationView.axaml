@@ -1,0 +1,140 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:arc="https://github.com/AIDotNet/TKCode.Arc"
+             xmlns:vm="using:HljuML.App.Core"
+             x:Class="HljuML.App.Views.Downloads.GameInstallationView"
+             x:DataType="vm:GameDownloadViewModel"
+             x:Name="DownloadRoot"
+             SizeChanged="OnSizeChanged">
+    <Grid RowDefinitions="Auto,*,Auto" RowSpacing="{arc:ArcDesignTokenResource Space4}">
+        <Grid x:Name="ConfigurationHeader"
+              ColumnDefinitions="Auto,Auto,*"
+              ColumnSpacing="{arc:ArcDesignTokenResource Space3}"
+              RowSpacing="{arc:ArcDesignTokenResource Space2}">
+            <arc:Button Content="← 返回版本"
+                        Variant="Ghost"
+                        Size="Small"
+                        Click="OnBackClicked"
+                        VerticalAlignment="Center"
+                        IsEnabled="{Binding !IsSubmitting}" />
+            <Image x:Name="ConfigurationIcon"
+                   Grid.Column="1"
+                   Source="{Binding InstanceIcon}"
+                   Width="{arc:ArcDesignTokenResource Space10}"
+                   Height="{arc:ArcDesignTokenResource Space10}"
+                   Stretch="Uniform"
+                   RenderOptions.BitmapInterpolationMode="None" />
+            <StackPanel x:Name="ConfigurationTitle" Grid.Column="2" VerticalAlignment="Center">
+                <TextBlock Classes="app-body"
+                           Text="配置下载"
+                           FontSize="{arc:ArcDesignTokenResource TypeLG}"
+                           FontWeight="SemiBold" />
+                <TextBlock Text="{Binding SelectedVersionLabel}" Classes="app-description" />
+            </StackPanel>
+        </Grid>
+        <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="{arc:ArcDesignTokenResource Space4}">
+                <arc:Input Label="实例名称"
+                           Size="Small"
+                           Text="{Binding InstanceName, Mode=TwoWay}"
+                           ErrorMessage="{Binding NameError}"
+                           MaxLength="128"
+                           IsEnabled="{Binding CanEditConfiguration}" />
+                <StackPanel Spacing="{arc:ArcDesignTokenResource Space2}" IsEnabled="{Binding CanEditConfiguration}">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Spacing="{arc:ArcDesignTokenResource Space1}">
+                            <TextBlock Classes="app-body" Text="加载器" FontWeight="SemiBold" />
+                            <TextBlock Text="选择一个加载器，或保留原版。" Classes="app-description" />
+                        </StackPanel>
+                        <arc:Button Grid.Column="1"
+                                    Content="重试加载器"
+                                    Variant="Secondary"
+                                    Size="Small"
+                                    IsVisible="{Binding HasLoaderErrors}"
+                                    IsLoading="{Binding AreLoadersLoading}"
+                                    Click="OnRetryLoadersClicked" />
+                    </Grid>
+                    <ItemsControl ItemsSource="{Binding LoaderChoices}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Spacing="{arc:ArcDesignTokenResource Space2}" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:GameLoaderChoice">
+                                <arc:ExpandableCard Description="{Binding Description}"
+                                                    AutomationProperties.Name="{Binding Label}"
+                                                    IsEnabled="{Binding !IsDisabled}"
+                                                    IsExpanded="{Binding IsExpanded, Mode=TwoWay}"
+                                                    ExpandedChanged="OnLoaderExpandedChanged">
+                                    <arc:ExpandableCard.Header>
+                                        <Grid ColumnDefinitions="Auto,*"
+                                              ColumnSpacing="{arc:ArcDesignTokenResource Space3}">
+                                            <Image Source="{Binding Icon}"
+                                                   Width="{arc:ArcDesignTokenResource Space6}"
+                                                   Height="{arc:ArcDesignTokenResource Space6}"
+                                                   RenderOptions.BitmapInterpolationMode="None" />
+                                            <TextBlock Classes="app-body"
+                                                       Grid.Column="1"
+                                                       Text="{Binding Label}"
+                                                       FontWeight="Medium"
+                                                       VerticalAlignment="Center" />
+                                        </Grid>
+                                    </arc:ExpandableCard.Header>
+                                    <StackPanel Spacing="{arc:ArcDesignTokenResource Space3}">
+                                        <arc:Select
+                                            Label="{CompiledBinding #DownloadRoot.((vm:GameDownloadViewModel)DataContext).LoaderVersionLabel}"
+                                            ItemsSource="{CompiledBinding #DownloadRoot.((vm:GameDownloadViewModel)DataContext).LoaderVersions}"
+                                            SelectedItem="{CompiledBinding #DownloadRoot.((vm:GameDownloadViewModel)DataContext).SelectedLoaderVersion, Mode=TwoWay}"
+                                            IsVisible="{Binding IsSelected}" />
+                                        <arc:Button Content="移除加载器"
+                                                    Variant="Danger"
+                                                    Size="Small"
+                                                    HorizontalAlignment="Left"
+                                                    IsVisible="{Binding IsSelected}"
+                                                    Click="OnRemoveLoaderClicked" />
+                                    </StackPanel>
+                                </arc:ExpandableCard>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+                <arc:ExpandableCard Header="默认实例目录" Description="新实例将安装到此目录，展开查看路径。">
+                    <StackPanel Spacing="{arc:ArcDesignTokenResource Space2}">
+                        <TextBlock Text="{Binding TargetDirectory}" Classes="app-description" TextWrapping="Wrap" />
+                        <TextBlock Text="所有新实例统一使用默认实例目录，此处无需选择。" Classes="app-description" TextWrapping="Wrap" />
+                    </StackPanel>
+                </arc:ExpandableCard>
+                <arc:Alert Title="无法创建安装任务"
+                           Content="{Binding InstallationError}"
+                           Tone="Danger"
+                           IsVisible="{Binding HasInstallationError}" />
+                <arc:Alert Title="已加入下载队列" Content="可在下载管理器中查看安装进度。" Tone="Success" IsVisible="{Binding IsEnqueued}" />
+            </StackPanel>
+        </ScrollViewer>
+        <Border Grid.Row="2"
+                Background="{arc:ArcDesignTokenResource SurfaceMuted}"
+                CornerRadius="{arc:ArcDesignTokenResource RadiusPanel}"
+                Tag="{arc:ArcDesignTokenResource Space3}"
+                Padding="{Binding $self.Tag, Converter={StaticResource UniformThicknessConverter}}">
+            <Grid x:Name="InstallFooter"
+                  ColumnDefinitions="*,Auto"
+                  ColumnSpacing="{arc:ArcDesignTokenResource Space3}"
+                  RowSpacing="{arc:ArcDesignTokenResource Space2}">
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="下载摘要" Classes="app-caption" />
+                    <TextBlock Classes="app-body" Text="{Binding InstallationSummary}" TextWrapping="Wrap" />
+                </StackPanel>
+                <arc:Button x:Name="InstallButton"
+                            Grid.Column="1"
+                            Variant="Primary"
+                            Size="Small"
+                            IsEnabled="{Binding CanInstall}"
+                            IsLoading="{Binding IsSubmitting}"
+                            Click="OnInstallClicked">
+                    <TextBlock Classes="app-body" Text="开始下载" Foreground="{arc:ArcDesignTokenResource Background}" />
+                </arc:Button>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

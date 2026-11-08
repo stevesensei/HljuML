@@ -1,0 +1,87 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:arc="https://github.com/AIDotNet/TKCode.Arc"
+             xmlns:vm="using:HljuML.App.Core"
+             x:Class="HljuML.App.Views.Shell.LauncherTitleBar"
+             x:DataType="vm:MainViewModel">
+    <Border Classes="floating">
+        <Grid ColumnDefinitions="*,Auto,*" ColumnSpacing="12">
+            <Border Background="Transparent" WindowDecorationProperties.ElementRole="TitleBar">
+                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <arc:ArcGlyph Data="{StaticResource BrandGlyph}"
+                                  Size="24"
+                                  Foreground="{arc:ArcDesignTokenResource Accent}" />
+                    <TextBlock Classes="app-heading"
+                               Text="HljuML"
+                               VerticalAlignment="Center"
+                               FontSize="{arc:ArcDesignTokenResource TypeLG}" />
+                </StackPanel>
+            </Border>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                <arc:Button x:Name="HomeButton"
+                            Size="Small"
+                            Variant="Secondary"
+                            Content="首页"
+                            Click="OnHomeClicked" />
+                <arc:Button x:Name="DownloadsButton"
+                            Size="Small"
+                            Variant="Ghost"
+                            Content="下载"
+                            Click="OnDownloadsClicked" />
+                <arc:Button x:Name="SettingsButton"
+                            Size="Small"
+                            Variant="Ghost"
+                            Content="设置"
+                            Click="OnSettingsClicked" />
+                <arc:Button Size="Small"
+                            Variant="Ghost"
+                            Content="输出日志"
+                            IsVisible="{Binding Settings.DebugMode}"
+                            Click="OnLogsClicked"
+                            ToolTip.Tip="查看当前会话最近 1000 条启动器日志；最低等级可在启动器设置中调整。" />
+            </StackPanel>
+            <Grid Grid.Column="2" ColumnDefinitions="*,Auto">
+                <Border Background="Transparent" WindowDecorationProperties.ElementRole="TitleBar" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                    <arc:Button Size="Small"
+                                Width="32"
+                                Padding="0"
+                                Variant="Ghost"
+                                WindowDecorationProperties.ElementRole="MinimizeButton"
+                                AutomationProperties.Name="最小化"
+                                ToolTip.Tip="最小化"
+                                Click="OnMinimizeClicked">
+                        <arc:ArcGlyph Data="{StaticResource MinimizeGlyph}" Size="16" IsHitTestVisible="False" />
+                    </arc:Button>
+                    <arc:Button x:Name="MaximizeButton"
+                                Size="Small"
+                                Width="32"
+                                Padding="0"
+                                Variant="Ghost"
+                                WindowDecorationProperties.ElementRole="MaximizeButton"
+                                AutomationProperties.Name="最大化"
+                                ToolTip.Tip="最大化"
+                                Click="OnMaximizeClicked">
+                        <Grid IsHitTestVisible="False">
+                            <arc:ArcGlyph x:Name="MaximizeIcon" Data="{StaticResource MaximizeGlyph}" Size="16" />
+                            <arc:ArcGlyph x:Name="RestoreIcon"
+                                          Data="{StaticResource RestoreGlyph}"
+                                          Size="16"
+                                          IsVisible="False" />
+                        </Grid>
+                    </arc:Button>
+                    <arc:Button Size="Small"
+                                Width="32"
+                                Padding="0"
+                                Variant="Ghost"
+                                WindowDecorationProperties.ElementRole="CloseButton"
+                                AutomationProperties.Name="关闭窗口"
+                                ToolTip.Tip="关闭窗口"
+                                Click="OnCloseClicked">
+                        <arc:ArcGlyph Data="{StaticResource CloseGlyph}" Size="16" IsHitTestVisible="False" />
+                    </arc:Button>
+                </StackPanel>
+            </Grid>
+        </Grid>
+    </Border>
+</UserControl>

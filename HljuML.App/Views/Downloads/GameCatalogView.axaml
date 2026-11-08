@@ -1,0 +1,161 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:arc="https://github.com/AIDotNet/TKCode.Arc"
+             xmlns:vm="using:HljuML.App.Core"
+             xmlns:controls="using:HljuML.App.Controls"
+             x:Class="HljuML.App.Views.Downloads.GameCatalogView"
+             x:DataType="vm:GameDownloadViewModel"
+             SizeChanged="OnSizeChanged">
+    <UserControl.Resources>
+        <DataTemplate x:Key="VersionRowTemplate" x:DataType="vm:GameCatalogRow">
+            <Border BorderBrush="{arc:ArcDesignTokenResource BorderSubtle}" BorderThickness="0,0,0,1">
+                <arc:Button Classes="version-row"
+                            Variant="Ghost"
+                            Size="Small"
+                            Click="OnVersionClicked"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Stretch"
+                            Tag="{arc:ArcDesignTokenResource Space3}"
+                            Padding="{Binding $self.Tag, Converter={StaticResource UniformThicknessConverter}}">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="{arc:ArcDesignTokenResource Space3}">
+                        <Image Source="avares://HljuML.App/Assets/loaders/minecraft.png"
+                               Width="{arc:ArcDesignTokenResource Space8}"
+                               Height="{arc:ArcDesignTokenResource Space8}"
+                               Stretch="Uniform"
+                               RenderOptions.BitmapInterpolationMode="None" />
+                        <StackPanel Grid.Column="1"
+                                    VerticalAlignment="Center"
+                                    Spacing="{arc:ArcDesignTokenResource Space1}">
+                            <TextBlock Classes="app-body" Text="{Binding Title}" FontWeight="Medium" />
+                            <TextBlock Text="{Binding Detail}"
+                                       Classes="app-description"
+                                       TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                        <TextBlock Classes="app-body"
+                                   Grid.Column="2"
+                                   Text="›"
+                                   VerticalAlignment="Center"
+                                   Foreground="{arc:ArcDesignTokenResource TextSecondary}" />
+                    </Grid>
+                </arc:Button>
+            </Border>
+        </DataTemplate>
+    </UserControl.Resources>
+    <UserControl.Styles>
+        <Style Selector="ListBox.version-list ListBoxItem">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Focusable" Value="False" />
+        </Style>
+    </UserControl.Styles>
+    <Grid RowDefinitions="Auto,Auto,Auto,*" RowSpacing="{arc:ArcDesignTokenResource Space4}">
+        <controls:PageHeader Title="下载游戏" Description="选择 Minecraft 版本并创建实例。">
+            <controls:PageHeader.Actions>
+                <arc:Button Content="刷新版本"
+                            Variant="Secondary"
+                            Size="Small"
+                            VerticalAlignment="Center"
+                            IsLoading="{Binding IsCatalogLoading}"
+                            Click="OnRefreshClicked" />
+            </controls:PageHeader.Actions>
+        </controls:PageHeader>
+        <StackPanel Grid.Row="1" Spacing="{arc:ArcDesignTokenResource Space3}">
+            <arc:Alert Title="无法更新版本目录"
+                       Content="{Binding CatalogError}"
+                       Tone="Danger"
+                       IsVisible="{Binding HasCatalogError}" />
+            <Grid x:Name="LatestGrid"
+                  ColumnDefinitions="*,*"
+                  ColumnSpacing="{arc:ArcDesignTokenResource Space3}"
+                  RowSpacing="{arc:ArcDesignTokenResource Space2}"
+                  IsVisible="{Binding HasVersions}">
+                <Border x:Name="LatestReleaseCard"
+                        Background="{arc:ArcDesignTokenResource SurfaceMuted}"
+                        CornerRadius="{arc:ArcDesignTokenResource RadiusPanel}">
+                    <StackPanel>
+                        <TextBlock Text="最新正式版"
+                                   Classes="app-caption"
+                                   Tag="{arc:ArcDesignTokenResource Space3}"
+                                   Margin="{Binding $self.Tag, Converter={StaticResource UniformThicknessConverter}}" />
+                        <ContentControl Content="{Binding LatestRelease}"
+                                        IsVisible="{Binding HasLatestRelease}"
+                                        HorizontalContentAlignment="Stretch"
+                                        ContentTemplate="{StaticResource VersionRowTemplate}" />
+                    </StackPanel>
+                </Border>
+                <Border x:Name="LatestSnapshotCard"
+                        Grid.Column="1"
+                        Background="{arc:ArcDesignTokenResource SurfaceMuted}"
+                        CornerRadius="{arc:ArcDesignTokenResource RadiusPanel}">
+                    <StackPanel>
+                        <TextBlock Text="最新快照版"
+                                   Classes="app-caption"
+                                   Tag="{arc:ArcDesignTokenResource Space3}"
+                                   Margin="{Binding $self.Tag, Converter={StaticResource UniformThicknessConverter}}" />
+                        <ContentControl Content="{Binding LatestSnapshot}"
+                                        IsVisible="{Binding HasLatestSnapshot}"
+                                        HorizontalContentAlignment="Stretch"
+                                        ContentTemplate="{StaticResource VersionRowTemplate}" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </StackPanel>
+        <Grid x:Name="CatalogToolbar"
+              Grid.Row="2"
+              ColumnDefinitions="*,Auto"
+              ColumnSpacing="{arc:ArcDesignTokenResource Space3}"
+              RowSpacing="{arc:ArcDesignTokenResource Space2}"
+              IsVisible="{Binding HasVersions}">
+            <arc:SearchField Label="筛选游戏版本"
+                             IsLabelVisible="False"
+                             Placeholder="输入版本 Id"
+                             ClearText="清除版本筛选"
+                             Size="Small"
+                             Text="{Binding SearchText, Mode=TwoWay}" />
+            <arc:SegmentedControl x:Name="CatalogSegments"
+                                  Grid.Column="1"
+                                  AutomationProperties.Name="版本类型"
+                                  SelectedValue="{Binding CatalogFilter, Mode=TwoWay}">
+                <arc:SegmentedOption Value="release" Label="正式版" />
+                <arc:SegmentedOption Value="snapshot" Label="快照版" />
+                <arc:SegmentedOption Value="old" Label="远古版" />
+            </arc:SegmentedControl>
+        </Grid>
+        <Grid Grid.Row="3">
+            <ListBox Classes="version-list"
+                     ItemsSource="{Binding CatalogRows}"
+                     IsVisible="{Binding HasCatalogRows}"
+                     Background="Transparent"
+                     BorderThickness="0"
+                     SelectionMode="Single"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     AutomationProperties.Name="Minecraft 版本目录">
+                <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <VirtualizingStackPanel />
+                    </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:GameCatalogRow">
+                        <ContentControl Content="{Binding}"
+                                        HorizontalContentAlignment="Stretch"
+                                        ContentTemplate="{StaticResource VersionRowTemplate}" />
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+            <StackPanel Spacing="{arc:ArcDesignTokenResource Space3}" IsVisible="{Binding IsCatalogLoading}">
+                <arc:Skeleton Lines="2" IsAvatarVisible="True" Label="正在获取游戏版本" />
+                <arc:Skeleton Lines="2" IsAvatarVisible="True" Label="正在获取游戏版本" />
+            </StackPanel>
+            <arc:EmptyState Title="暂无游戏版本"
+                            Description="版本目录为空，请刷新后重试。"
+                            Label="游戏版本目录"
+                            IsVisible="{Binding IsCatalogEmpty}" />
+            <arc:EmptyState Title="没有匹配的版本"
+                            Description="请更换版本类型或清除筛选。"
+                            Icon="{x:Static arc:ArcIcons.Search}"
+                            Label="版本筛选结果"
+                            IsVisible="{Binding IsCatalogFilteredEmpty}" />
+        </Grid>
+    </Grid>
+</UserControl>
