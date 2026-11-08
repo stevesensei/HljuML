@@ -10,7 +10,7 @@ using HljuML.Core.GamePlay;
 
 namespace HljuML.App.Core;
 
-public sealed class CommunityResourceViewModel : INotifyPropertyChanged, IDisposable
+public sealed partial class CommunityResourceViewModel : INotifyPropertyChanged, IDisposable
 {
     private static readonly IReadOnlyList<string> LoaderFilters =
         ["全部加载器", "原版", "Fabric", "Forge", "NeoForge", "Quilt"];
@@ -28,9 +28,10 @@ public sealed class CommunityResourceViewModel : INotifyPropertyChanged, IDispos
     private CommunityResourceItem? _selectedResource;
     private CommunityResourceType _resourceType = CommunityResourceType.Mod;
 
-    public CommunityResourceViewModel(GameInstanceService gameInstances, CancellationToken stopping)
+    public CommunityResourceViewModel(GameInstanceService gameInstances, ModpackImportService imports, CancellationToken stopping)
     {
         _gameInstances = gameInstances;
+        _imports = imports;
         _stopping = stopping;
         CategoryOptions = CategoriesFor(_resourceType);
     }

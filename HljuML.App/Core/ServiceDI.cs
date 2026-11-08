@@ -25,6 +25,7 @@ public static class ServiceCollectionExtensions
         collection.AddSingleton<ColorMcOperationCoordinator>();
         collection.AddSingleton<GameCatalogService>();
         collection.AddSingleton<GameInstallationService>();
+        collection.AddSingleton<ModpackImportService>();
         collection.AddSingleton<GameInstanceService>();
         collection.AddHostedService(services => services.GetRequiredService<GameInstanceService>());
         collection.AddHostedService(services => services.GetRequiredService<GameInstallationService>());

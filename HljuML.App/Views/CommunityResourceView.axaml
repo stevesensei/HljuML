@@ -30,6 +30,11 @@
         <StackPanel Spacing="{arc:ArcDesignTokenResource Space1}">
             <TextBlock Text="{Binding Title}" FontSize="{arc:ArcDesignTokenResource Type3XL}" FontWeight="SemiBold" />
             <TextBlock Text="{Binding Description}" Classes="description" TextWrapping="Wrap" />
+            <arc:Button Content="导入本地整合包" Variant="Secondary" Size="Small" HorizontalAlignment="Left"
+                        IsVisible="{Binding ShowsModpackDestination}" IsLoading="{Binding IsImporting}"
+                        Click="OnImportModpackClicked" />
+            <arc:Alert Title="无法导入整合包" Content="{Binding ImportError}" Tone="Danger"
+                       IsVisible="{Binding HasImportError}" />
         </StackPanel>
 
         <Border Grid.Row="1" Classes="section">

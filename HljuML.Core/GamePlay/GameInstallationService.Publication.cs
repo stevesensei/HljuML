@@ -57,6 +57,9 @@ public sealed partial class GameInstallationService
         downloads.SetOperationPhase(installation.OperationId, "正在校验全部必需文件");
         foreach (var artifact in artifacts)
             await RequireValidAsync(artifact, token);
+        if (installation.Modpack is { } pack)
+            await ModpackImportService.PrepareContentAsync(pack, stage, game, downloads, installation.OperationId, token);
+        token.ThrowIfCancellationRequested();
         var marker = new PendingInstallation(installation.OperationId, installation.InstanceId, artifacts);
         var markerUpdate = Path.Combine(stage, PendingMarker + ".tmp");
         await WriteNewJsonAsync(markerUpdate, marker, token);

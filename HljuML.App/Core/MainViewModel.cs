@@ -39,7 +39,7 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
 
     public MainViewModel(GameInstanceService gameInstances, IHostApplicationLifetime appLifetime,
         IServiceScopeFactory scopeFactory, DownloadManagementService downloads, JavaEnvService java,
-        GameCatalogService catalog, GameInstallationService installations)
+        GameCatalogService catalog, GameInstallationService installations, ModpackImportService imports)
     {
         _gameInstances = gameInstances;
         _appLifetime = appLifetime;
@@ -48,7 +48,7 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
         Downloads = new DownloadQueueViewModel(downloads);
         GameDownloads = new GameDownloadViewModel(catalog, installations, appLifetime.ApplicationStopping);
         DownloadHub = new DownloadHubViewModel(GameDownloads,
-            new CommunityResourceViewModel(gameInstances, appLifetime.ApplicationStopping));
+            new CommunityResourceViewModel(gameInstances, imports, appLifetime.ApplicationStopping));
         JavaSettings = new JavaSettingsViewModel(java, appLifetime.ApplicationStopping);
         RunningInstances = _gameInstances.GetRunningInstances();
         _gameInstances.RunningInstancesChanged += OnRunningInstancesChanged;

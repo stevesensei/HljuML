@@ -350,6 +350,7 @@ public sealed class GameInstanceService(IServiceScopeFactory scopeFactory, JavaE
         ColorMCCore.Init(new()
         {
             Local = LauncherPaths.ColorMcDirectory,
+            CurseForgeKey = "$2a$10$ZEIKK/IxI6VA.RujTLD8vu3YwTVM/Syq6tvaImx1X4U773QzWDGMO"
         });
         
         var http = ConfigLoad.Config.Http;

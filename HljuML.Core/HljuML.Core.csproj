@@ -30,6 +30,12 @@
       <Compile Update="GamePlay\GameInstallationService.Validation.cs">
         <DependentUpon>GameInstallationService.cs</DependentUpon>
       </Compile>
+      <Compile Update="GamePlay\GameInstallationService.Modpacks.cs">
+        <DependentUpon>GameInstallationService.cs</DependentUpon>
+      </Compile>
+      <Compile Update="GamePlay\ModpackImportService.Files.cs">
+        <DependentUpon>ModpackImportService.cs</DependentUpon>
+      </Compile>
     </ItemGroup>
 
 </Project>

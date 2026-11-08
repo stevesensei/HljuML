@@ -27,6 +27,12 @@ public sealed partial class DownloadManagementService
     {
         switch (error)
         {
+            case ApiRequestErrorEventArgs failure:
+                logger.LogWarning(failure.Exception, "ColorMC 平台 API 请求失败：{Source}", GetLogSource(failure.Url));
+                break;
+            case InstallModPackErrorEventArgs failure:
+                logger.LogError(failure.Exception, "ColorMC 整合包导入失败：{File}", failure.File);
+                break;
             case DownloadExceptionErrorEventArgs failure:
                 logger.LogWarning(failure.Exception,
                     "下载异常：{FileName}；来源 {Source}；目标 {Destination}；累计异常次数 {FailureCount}；已下载 {DownloadedBytes}/{TotalBytes} 字节。ColorMC 将按内部策略重试或切换下载源。",

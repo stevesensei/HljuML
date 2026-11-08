@@ -2,6 +2,7 @@ using System.Threading.Channels;
 using ColorMC.Core.Objs;
 using HljuML.Core.Infrastructure.Downloads;
 using HljuML.Core.Infrastructure.Storage;
+using HljuML.Core.Model;
 using HljuML.Shared.Model;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,8 +30,17 @@ public sealed partial class GameInstallationService(IServiceScopeFactory scopeFa
         await base.StartAsync(cancellationToken);
     }
 
-    public async Task<ServiceResult<Guid>> EnqueueAsync(GameInstallationRequest request,
-        CancellationToken cancellationToken = default)
+    /// <summary>将原版或加载器安装加入统一队列，名称占用检查与整合包安装共享。</summary>
+    public Task<ServiceResult<Guid>> EnqueueAsync(GameInstallationRequest request,
+        CancellationToken cancellationToken = default) => EnqueueCoreAsync(request, null, cancellationToken);
+
+    /// <summary>接收已验证的整合包快照，复用安装目录、数据库事务及完成通知。</summary>
+    internal Task<ServiceResult<Guid>> EnqueueModpackAsync(GameInstallationRequest request, PreparedModpack pack,
+        CancellationToken cancellationToken) => EnqueueCoreAsync(request, pack, cancellationToken);
+
+    /// <summary>统一校验安装参数并保留实例名称，保证不同安装入口不会创建同名实例。</summary>
+    private async Task<ServiceResult<Guid>> EnqueueCoreAsync(GameInstallationRequest request, PreparedModpack? pack,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Length > 128
             || request.Name.Any(char.IsControl))
@@ -57,9 +67,9 @@ public sealed partial class GameInstallationService(IServiceScopeFactory scopeFa
             if (_reservedNames.Contains(request.Name) || await NameExistsAsync(request.Name, cancellationToken))
                 return ServiceResult<Guid>.FailureResult(message: "默认目录中已有同名实例或安装任务，请更换名称。");
             var instanceId = Guid.NewGuid();
-            var operationId = downloads.CreateOperation($"安装 {request.Name}", instanceId);
+            var operationId = downloads.CreateOperation($"{(pack is null ? "安装" : "导入整合包")} {request.Name}", instanceId);
             _reservedNames.Add(request.Name);
-            if (!_queue.Writer.TryWrite(new Installation(operationId, instanceId, request)))
+            if (!_queue.Writer.TryWrite(new Installation(operationId, instanceId, request, pack, cancellationToken)))
             {
                 _reservedNames.Remove(request.Name);
                 downloads.CompleteOperation(operationId, DownloadStatus.Failed, "安装服务已停止。");
@@ -76,31 +86,37 @@ public sealed partial class GameInstallationService(IServiceScopeFactory scopeFa
         {
             await foreach (var installation in _queue.Reader.ReadAllAsync(stoppingToken))
             {
+                using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, installation.Token);
+                var token = cancellation.Token;
                 try
                 {
-                    using (await coordinator.EnterAsync(stoppingToken))
+                    using (await coordinator.EnterAsync(token))
                     {
                         await downloads.TrackOperationAsync(installation.OperationId, async () =>
                         {
-                            await InstallAsync(installation, stoppingToken);
+                            await InstallAsync(installation, token);
                             return true;
-                        }, stoppingToken);
+                        }, token);
                     }
                     downloads.CompleteOperation(installation.OperationId, DownloadStatus.Succeeded);
                     if (downloads.GetDownload(installation.OperationId)?.Status == DownloadStatus.Succeeded)
                         NotifyInstalled();
                 }
-                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                catch (OperationCanceledException) when (token.IsCancellationRequested)
                 {
+                    await CleanupFailedImportAsync(installation);
                     downloads.CompleteOperation(installation.OperationId, DownloadStatus.Canceled, "安装已取消。");
                 }
                 catch (Exception error)
                 {
+                    await CleanupFailedImportAsync(installation);
                     logger.LogError(error, "Installation failed for {InstanceId}", installation.InstanceId);
                     downloads.CompleteOperation(installation.OperationId, DownloadStatus.Failed, error.Message);
                 }
                 finally
                 {
+                    if (installation.Modpack is { } pack)
+                        ModpackImportService.ReleaseArchive(pack.ArchivePath, logger);
                     await _enqueueGate.WaitAsync(CancellationToken.None);
                     try { _reservedNames.Remove(installation.Request.Name); }
                     finally { _enqueueGate.Release(); }
@@ -111,7 +127,10 @@ public sealed partial class GameInstallationService(IServiceScopeFactory scopeFa
         finally
         {
             while (_queue.Reader.TryRead(out var pending))
+            {
                 downloads.CompleteOperation(pending.OperationId, DownloadStatus.Canceled, "应用已退出，安装未开始。");
+                if (pending.Modpack is { } pack) ModpackImportService.ReleaseArchive(pack.ArchivePath, logger);
+            }
         }
     }
 
@@ -137,5 +156,6 @@ public sealed partial class GameInstallationService(IServiceScopeFactory scopeFa
                 .Any(game => string.Equals(game.Name, name, StringComparison.OrdinalIgnoreCase));
     }
 
-    private sealed record Installation(Guid OperationId, Guid InstanceId, GameInstallationRequest Request);
+    private sealed record Installation(Guid OperationId, Guid InstanceId, GameInstallationRequest Request,
+        PreparedModpack? Modpack, CancellationToken Token);
 }
