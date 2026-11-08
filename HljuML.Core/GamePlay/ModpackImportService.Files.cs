@@ -71,8 +71,9 @@ public sealed partial class ModpackImportService
             if (entry.TryGetProperty("env", out var environment) && environment.TryGetProperty("client", out var client))
             {
                 var requirement = client.GetString();
-                if (requirement == "unsupported" || requirement == "optional" && !optional) continue;
-                if (requirement is not ("required" or "optional"))
+                //为啥会有unknown的mod啊
+                if ((requirement == "unsupported" || requirement == "optional"|| requirement == "unknown" )&& !optional) continue;
+                if (requirement is not ("required" or "optional" or "unknown"))
                     throw new InvalidDataException("整合包包含无效的客户端 env 设置。");
             }
             var path = ModpackArchive.NormalizePath(ModpackArchive.RequiredString(entry, "path"));

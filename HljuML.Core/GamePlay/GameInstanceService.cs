@@ -121,12 +121,6 @@ public sealed partial class GameInstanceService(IServiceScopeFactory scopeFactor
             if (profileResult.Data is not { } profile)
                 return ServiceResult<int?>.FailureResult(message: profileResult.Message);
 
-            if (profile.AuthMethod == AuthMethod.Custom)
-                progress?.Report(new("正在刷新外置登录"));
-            var loginResult = await profiles.GetLaunchLogin(profile, stoppingToken);
-            if (loginResult.Data is not { } login)
-                return ServiceResult<int?>.FailureResult(message: loginResult.Message, errorCode: loginResult.ErrorCode);
-
             var gameResult = await ResolveGame(instanceData, progress, stoppingToken);
             if (gameResult.Data is not { } game)
                 return ServiceResult<int?>.FailureResult(message: gameResult.Message);
@@ -136,27 +130,35 @@ public sealed partial class GameInstanceService(IServiceScopeFactory scopeFactor
                 ? MinecraftPath.UseResourceDirectory(resourceDirectory)
                 : null;
 
-            if (string.IsNullOrWhiteSpace(game.JvmLocal)
-                && string.IsNullOrWhiteSpace(game.JvmName))
+            progress?.Report(new("正在检查实例所需的 Java 版本"));
+            JavaLaunchSelection? selection;
+            int requiredJava;
+            try
             {
-                if (javaEnvironments.DefaultJavaPath is { Length: > 0 } defaultJava)
-                {
-                    if (!File.Exists(defaultJava))
-                        return ServiceResult<int?>.FailureResult(message: "默认 Java 已不可用，请在设置中重新扫描并选择。");
-                    game = game with { JvmLocal = defaultJava };
-                }
-                else if (game.Loader == Loaders.Normal)
-                {
-                    progress?.Report(new("正在匹配 Java 运行环境"));
-                    var java = await javaEnvironments.FindForMinecraftVersionAsync(game.Version, stoppingToken);
-                    if (java is not null)
-                        game = game with { JvmLocal = java.Path };
-                }
+                requiredJava = await JavaEnvService.GetRequiredLaunchMajorAsync(game, stoppingToken);
+                selection = await javaEnvironments.SelectForLaunchAsync(game, requiredJava, stoppingToken);
             }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException
+                or System.Text.Json.JsonException or ArgumentException)
+            {
+                logger.LogWarning(error, "无法检查实例 {InstanceId} 的 Java 环境", instanceId);
+                return ServiceResult<int?>.FailureResult(message: $"无法检查 Java 环境：{error.Message}");
+            }
+            if (selection is null)
+                return ServiceResult<int?>.FailureResult(message:
+                    $"实例至少需要 Java {requiredJava}，Java 列表中没有满足要求的可用环境。请安装后在设置中扫描或手动添加 Java，再重新启动。");
 
-            // 兼容之前保存为 java.exe 的实例；只选择同一目录的 javaw.exe，不改变实例使用的 Java 版本。
-            if (game.JvmLocal is { Length: > 0 } javaPath)
-                game = game with { JvmLocal = JavaExecutablePreference.PreferWindowed(javaPath) };
+            // 传入确定的路径，防止 ColorMC 再次按自己的规则选用较低或差值更大的版本。
+            game = game with { JvmLocal = selection.Java.Path, JvmName = null };
+            logger.LogInformation("实例 {InstanceId} 推荐 Java {Required}，本次使用 Java {Selected}：{Path}",
+                instanceId, requiredJava, selection.Java.MajorVersion, selection.Java.Path);
+            if (profile.AuthMethod == AuthMethod.Custom)
+                progress?.Report(new("正在刷新外置登录"));
+            var loginResult = await profiles.GetLaunchLogin(profile, stoppingToken);
+            if (loginResult.Data is not { } login)
+                return ServiceResult<int?>.FailureResult(message: loginResult.Message, errorCode: loginResult.ErrorCode);
+            progress?.Report(new($"已选择 Java {selection.Java.MajorVersion}", JavaWarning: selection.NeedsWarning
+                ? new JavaVersionWarning(selection.Java.MajorVersion, requiredJava) : null));
 
             var reporter = progress is null ? null : new GameLaunchReporter(progress);
             // 外置会话已经由应用刷新并持久化，核心只复用；微软会话仍沿用核心的刷新流程。

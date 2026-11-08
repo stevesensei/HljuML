@@ -4,6 +4,7 @@
         <TargetFramework>net10.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ApplicationManifest>app.manifest</ApplicationManifest>
+        <ApplicationIcon>Assets/app.ico</ApplicationIcon>
     </PropertyGroup>
 
     <ItemGroup>
@@ -28,6 +29,7 @@
         <AvaloniaResource Include="Assets/instance_icon_default.jpg" />
         <AvaloniaResource Include="Assets/loaders/**" />
         <AvaloniaResource Include="Assets/Dever/**" />
+        <AvaloniaResource Include="Assets/app.ico" />
     </ItemGroup>
 
     <ItemGroup>

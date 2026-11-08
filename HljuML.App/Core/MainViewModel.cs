@@ -63,6 +63,7 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
 
     public event PropertyChangedEventHandler? PropertyChanged;
     public event Action? GameStarted;
+    public event Action<JavaVersionWarning>? JavaWarningRaised;
     public SettingsViewModel Settings { get; }
 
     public DownloadQueueViewModel Downloads { get; }
@@ -223,13 +224,20 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
         _isLaunching = true;
         _progress = new("正在准备启动");
         var attempt = ++_launchAttempt;
+        var javaWarningShown = false;
         NotifyLaunchState();
 
         try
         {
             var progress = new Progress<GameLaunchProgress>(update =>
             {
-                if (_isLaunching && _launchAttempt == attempt)
+                if (_disposed || _launchAttempt != attempt) return;
+                if (update.JavaWarning is { } warning && !javaWarningShown)
+                {
+                    javaWarningShown = true;
+                    JavaWarningRaised?.Invoke(warning);
+                }
+                if (_isLaunching)
                 {
                     _progress = update;
                     NotifyLaunchStatus();

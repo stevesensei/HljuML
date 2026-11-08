@@ -58,6 +58,7 @@ public partial class MainWindow : Window
         if (DataContext is MainViewModel viewModel)
         {
             viewModel.GameStarted += OnGameStarted;
+            viewModel.JavaWarningRaised += OnJavaWarning;
             RefreshDownloads();
             _downloadsTimer.Start();
             if (_openDownloadsWhenOpened)
@@ -71,7 +72,11 @@ public partial class MainWindow : Window
         _downloadsTimer.Stop();
         _downloadsTimer.Tick -= OnDownloadsTick;
         _closed = true;
-        if (DataContext is MainViewModel mainModel) mainModel.GameStarted -= OnGameStarted;
+        if (DataContext is MainViewModel mainModel)
+        {
+            mainModel.GameStarted -= OnGameStarted;
+            mainModel.JavaWarningRaised -= OnJavaWarning;
+        }
         _logsWindow?.Close();
         if (DataContext is MainViewModel viewModel) viewModel.ModpackImport.IsOpen = false;
         if (_downloads is not null)
@@ -227,6 +232,13 @@ public partial class MainWindow : Window
     {
         if (DataContext is MainViewModel viewModel && await viewModel.LaunchGameAsync(ReauthenticateProfileAsync) is { } error && IsVisible)
             Toast.Show(this, "启动失败", ToastKind.Error, error);
+    }
+
+    private void OnJavaWarning(HljuML.Core.GamePlay.JavaVersionWarning warning)
+    {
+        if (!_closed)
+            Toast.Show(this, "Java 版本提醒", ToastKind.Warning,
+                $"当前版本 Java {warning.SelectedMajor} 并非实例推荐 Java 版本 Java {warning.RecommendedMajor}，可能会无法启动，请留意。");
     }
 
     /// <summary>只恢复原启动选中的档案；用户关闭窗口时取消恢复，不切换账号或离线启动。</summary>

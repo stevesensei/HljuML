@@ -42,6 +42,9 @@
       <Compile Update="GamePlay\GameInstanceService.Window.cs">
         <DependentUpon>GameInstanceService.cs</DependentUpon>
       </Compile>
+      <Compile Update="GamePlay\JavaEnvService.LaunchSelection.cs">
+        <DependentUpon>JavaEnvService.cs</DependentUpon>
+      </Compile>
     </ItemGroup>
 
 </Project>

@@ -17,6 +17,7 @@
         ExtendClientAreaToDecorationsHint="True"
         RequestedThemeVariant="Light"
         Background="Transparent"
+        Icon="avares://HljuML.App/Assets/app.ico"
         TransparencyLevelHint="Transparent"
         TransparencyBackgroundFallback="{StaticResource CanvasBrush}">
     <Grid>
@@ -57,7 +58,7 @@
                                 Tag="{arc:ArcDesignTokenResource Space4}"
                                 Margin="{Binding $self.Tag, Converter={StaticResource UniformThicknessConverter}}"
                                 DataContext="{Binding Settings}" />
-            <arc:ToastStack Grid.Row="1" Label="通知" IsContained="True" />
+            <arc:ToastStack Grid.Row="1" Label="通知" Position="BottomRight" IsContained="True" />
             <arc:Button Grid.Row="2"
                         Size="Small"
                         Variant="Secondary"

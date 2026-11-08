@@ -4,8 +4,11 @@ using ColorMC.Core.Objs.Login;
 
 namespace HljuML.Core.GamePlay;
 
+public sealed record JavaVersionWarning(int SelectedMajor, int RecommendedMajor);
+
 public sealed record GameLaunchProgress(string Operation, int? ProcessedFiles = null, int? TotalFiles = null,
-    string? FileName = null, long DownloadedBytes = 0, long? FileBytes = null);
+    string? FileName = null, long DownloadedBytes = 0, long? FileBytes = null,
+    JavaVersionWarning? JavaWarning = null);
 
 internal sealed class GameLaunchReporter(IProgress<GameLaunchProgress> progress) : ILaunchGui
 {
