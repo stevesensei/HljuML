@@ -33,10 +33,13 @@ public static class ServiceCollectionExtensions
         collection.AddHostedService(services => services.GetRequiredService<GameInstallationService>());
         collection.AddHostedService(services => services.GetRequiredService<JavaEnvService>());
         collection.AddSingleton<DownloadManagementService>();
+        collection.AddSingleton<DownloadTrafficService>();
         collection.AddHostedService(services => services.GetRequiredService<DownloadManagementService>());
         collection.AddSingleton<MainViewModel>();
         collection.AddSingleton(services => new MainWindow(services.GetRequiredService<IServiceScopeFactory>(),
-            services.GetRequiredService<DownloadManagementService>())
+            services.GetRequiredService<DownloadManagementService>(),
+            services.GetRequiredService<HljuML.Core.Infrastructure.Settings.LauncherSettingsService>(),
+            services.GetRequiredService<HljuML.Core.Infrastructure.Logging.LauncherFileLoggerProvider>())
         {
             DataContext = services.GetRequiredService<MainViewModel>()
         });

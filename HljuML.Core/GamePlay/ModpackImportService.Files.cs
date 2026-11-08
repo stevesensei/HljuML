@@ -37,7 +37,7 @@ public sealed partial class ModpackImportService
 
         downloads.SetOperationPhase(operationId, "正在下载并校验整合包文件");
         // 直接使用下载管理服务并逐个验证摘要，不采用会忽略下载返回值的 ColorMC InstallZip 入口。
-        await Parallel.ForEachAsync(files, new ParallelOptions { CancellationToken = token, MaxDegreeOfParallelism = 4 },
+        await Parallel.ForEachAsync(files, new ParallelOptions { CancellationToken = token, MaxDegreeOfParallelism = downloads.DownloadConcurrency },
             async (file, cancellation) =>
             {
                 var destination = ModpackArchive.ResolvePath(gameDirectory, file.Path);

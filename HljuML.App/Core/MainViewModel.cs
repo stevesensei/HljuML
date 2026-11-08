@@ -15,6 +15,7 @@ using HljuML.Shared.Model;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using HljuML.Core.Infrastructure.Settings;
 
 namespace HljuML.App.Core;
 
@@ -41,7 +42,8 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
     public MainViewModel(GameInstanceService gameInstances, IHostApplicationLifetime appLifetime,
         IServiceScopeFactory scopeFactory, DownloadManagementService downloads, JavaEnvService java,
         GameCatalogService catalog, GameInstallationService installations, ModpackImportService imports,
-        JavaRuntimeService runtimes, ILogger<ModpackImportViewModel> importLogger)
+        JavaRuntimeService runtimes, ILogger<ModpackImportViewModel> importLogger,
+        LauncherSettingsService settings, ILogger<SettingsViewModel> settingsLogger)
     {
         _gameInstances = gameInstances;
         _appLifetime = appLifetime;
@@ -53,12 +55,15 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
             new CommunityResourceViewModel(gameInstances, appLifetime.ApplicationStopping));
         ModpackImport = new ModpackImportViewModel(imports, runtimes, importLogger, appLifetime.ApplicationStopping);
         JavaSettings = new JavaSettingsViewModel(java, appLifetime.ApplicationStopping);
+        Settings = new SettingsViewModel(settings, JavaSettings, settingsLogger);
         RunningInstances = _gameInstances.GetRunningInstances();
         _gameInstances.RunningInstancesChanged += OnRunningInstancesChanged;
         _installations.Installed += OnInstalled;
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
+    public event Action? GameStarted;
+    public SettingsViewModel Settings { get; }
 
     public DownloadQueueViewModel Downloads { get; }
     public GameDownloadViewModel GameDownloads { get; }
@@ -245,6 +250,8 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
                 result = await _gameInstances.LaunchGameInstance(profile.Id, instance.Id,
                     _appLifetime.ApplicationStopping, progress);
             }
+            if (result.Status == ServiceStatus.Success && !_appLifetime.ApplicationStopping.IsCancellationRequested)
+                GameStarted?.Invoke();
             return result.Status == ServiceStatus.Success || _appLifetime.ApplicationStopping.IsCancellationRequested
                 ? null : result.Message ?? "无法启动游戏，请重试。";
         }
@@ -320,6 +327,7 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
         _disposed = true;
         ModpackImport.Dispose();
         JavaSettings.Dispose();
+        Settings.Dispose();
         DownloadHub.Dispose();
         GameDownloads.Dispose();
         _gameInstances.RunningInstancesChanged -= OnRunningInstancesChanged;

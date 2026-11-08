@@ -41,10 +41,14 @@ public partial class MainWindow : Window
         _downloadsTimer.Tick += OnDownloadsTick;
     }
 
-    internal MainWindow(IServiceScopeFactory scopes, DownloadManagementService downloads) : this()
+    internal MainWindow(IServiceScopeFactory scopes, DownloadManagementService downloads,
+        HljuML.Core.Infrastructure.Settings.LauncherSettingsService settings,
+        HljuML.Core.Infrastructure.Logging.LauncherFileLoggerProvider logs) : this()
     {
         _scopes = scopes;
         _downloads = downloads;
+        _settings = settings;
+        _logs = logs;
         _downloads.TaskCreated += OnDownloadTaskCreated;
     }
 
@@ -55,6 +59,7 @@ public partial class MainWindow : Window
         base.OnOpened(e);
         if (DataContext is MainViewModel viewModel)
         {
+            viewModel.GameStarted += OnGameStarted;
             RefreshDownloads();
             _downloadsTimer.Start();
             if (_openDownloadsWhenOpened)
@@ -68,6 +73,8 @@ public partial class MainWindow : Window
         _downloadsTimer.Stop();
         _downloadsTimer.Tick -= OnDownloadsTick;
         _closed = true;
+        if (DataContext is MainViewModel mainModel) mainModel.GameStarted -= OnGameStarted;
+        _logsWindow?.Close();
         if (DataContext is MainViewModel viewModel) viewModel.ModpackImport.IsOpen = false;
         if (_downloads is not null)
             _downloads.TaskCreated -= OnDownloadTaskCreated;
@@ -83,7 +90,11 @@ public partial class MainWindow : Window
         ShowPage(DownloadsPage, DownloadsButton);
     }
 
-    private void OnDownloadsTick(object? sender, EventArgs e) => RefreshDownloads();
+    private void OnDownloadsTick(object? sender, EventArgs e)
+    {
+        RefreshDownloads();
+        TryDeferredClose();
+    }
 
     private void RefreshDownloads()
     {
@@ -149,7 +160,7 @@ public partial class MainWindow : Window
         HomePage.IsVisible = page == HomePage;
         DownloadsPage.IsVisible = page == DownloadsPage;
         SettingsPage.IsVisible = page == SettingsPage;
-        PageScroll.IsVisible = page != DownloadsPage;
+        PageScroll.IsVisible = page == HomePage;
         HomeButton.Variant = activeButton == HomeButton ? ButtonVariant.Secondary : ButtonVariant.Ghost;
         DownloadsButton.Variant = activeButton == DownloadsButton ? ButtonVariant.Secondary : ButtonVariant.Ghost;
         SettingsButton.Variant = activeButton == SettingsButton ? ButtonVariant.Secondary : ButtonVariant.Ghost;

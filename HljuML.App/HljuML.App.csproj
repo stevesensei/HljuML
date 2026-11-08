@@ -27,6 +27,7 @@
         <AvaloniaResource Include="Assets/player-placeholder.png" />
         <AvaloniaResource Include="Assets/instance_icon_default.jpg" />
         <AvaloniaResource Include="Assets/loaders/**" />
+        <AvaloniaResource Include="Assets/Dever/**" />
     </ItemGroup>
 
     <ItemGroup>
@@ -46,6 +47,9 @@
       </Compile>
       <Compile Update="Views\AccountWindow.Management.cs">
         <DependentUpon>AccountWindow.axaml</DependentUpon>
+      </Compile>
+      <Compile Update="Views\LogWindow.axaml.cs">
+        <DependentUpon>LogWindow.axaml</DependentUpon>
       </Compile>
     </ItemGroup>
 </Project>

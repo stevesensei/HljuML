@@ -2,12 +2,16 @@ using System.Diagnostics;
 using System.Text;
 using HljuML.Core.Infrastructure.Storage;
 using Microsoft.Extensions.Logging;
+using HljuML.Core.Infrastructure.Settings;
 
 namespace HljuML.Core.Infrastructure.Logging;
 
-public sealed class LauncherFileLoggerProvider : ILoggerProvider
+public sealed class LauncherFileLoggerProvider(LauncherSettingsService settings) : ILoggerProvider
 {
     private readonly object _sync = new();
+    private readonly Queue<string> _recent = new();
+    public string GetRecentText() { lock (_sync) return string.Concat(_recent); }
+    private bool IsLevelEnabled(LogLevel level) => level >= settings.Value.MinimumLogLevel && level != LogLevel.None;
 
     public ILogger CreateLogger(string categoryName) => new FileLogger(this, categoryName);
     public void Dispose() { }
@@ -19,6 +23,8 @@ public sealed class LauncherFileLoggerProvider : ILoggerProvider
         if (exception is not null) text += exception + Environment.NewLine;
         lock (_sync)
         {
+            _recent.Enqueue(text);
+            while (_recent.Count > 1000) _recent.Dequeue();
             try
             {
                 Directory.CreateDirectory(LauncherPaths.LogDirectory);
@@ -35,7 +41,7 @@ public sealed class LauncherFileLoggerProvider : ILoggerProvider
     private sealed class FileLogger(LauncherFileLoggerProvider owner, string category) : ILogger
     {
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
-        public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Information && logLevel != LogLevel.None;
+        public bool IsEnabled(LogLevel logLevel) => owner.IsLevelEnabled(logLevel);
 
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
             Func<TState, Exception?, string> formatter)

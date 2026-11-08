@@ -39,6 +39,9 @@
       <Compile Update="GamePlay\JavaRuntimeService.Install.cs">
         <DependentUpon>JavaRuntimeService.cs</DependentUpon>
       </Compile>
+      <Compile Update="GamePlay\GameInstanceService.Window.cs">
+        <DependentUpon>GameInstanceService.cs</DependentUpon>
+      </Compile>
     </ItemGroup>
 
 </Project>

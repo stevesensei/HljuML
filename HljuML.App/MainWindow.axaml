@@ -96,6 +96,9 @@
 
     <Grid>
         <Border x:Name="WindowFrame" Classes="rounded-window" Background="{StaticResource CanvasBrush}" />
+        <Border CornerRadius="{Binding #WindowFrame.CornerRadius}" ClipToBounds="True" IsHitTestVisible="False">
+            <Image Source="{Binding Settings.BackgroundImage}" Stretch="UniformToFill" />
+        </Border>
         <Grid Margin="24,0" RowDefinitions="Auto,*,Auto,Auto">
             <Border Classes="floating" Margin="0,16,0,8" MaxWidth="864">
                 <Grid ColumnDefinitions="*,Auto,*" ColumnSpacing="12">
@@ -112,6 +115,8 @@
                         <arc:Button x:Name="HomeButton" Size="Small" Variant="Secondary" Content="首页" Click="OnHomeClicked" />
                         <arc:Button x:Name="DownloadsButton" Size="Small" Variant="Ghost" Content="下载" Click="OnDownloadsClicked" />
                         <arc:Button x:Name="SettingsButton" Size="Small" Variant="Ghost" Content="设置" Click="OnSettingsClicked" />
+                        <arc:Button Size="Small" Variant="Ghost" Content="输出日志" IsVisible="{Binding Settings.DebugMode}"
+                                    Click="OnLogsClicked" ToolTip.Tip="查看当前会话最近 1000 条启动器日志；最低等级可在启动器设置中调整。" />
                     </StackPanel>
                     <Grid Grid.Column="2" ColumnDefinitions="*,Auto">
                         <Border Background="Transparent" WindowDecorationProperties.ElementRole="TitleBar" />
@@ -221,10 +226,6 @@
                         </layout:MasonryPanel>
                     </StackPanel>
 
-                    <StackPanel x:Name="SettingsPage" IsVisible="False" Spacing="{arc:ArcDesignTokenResource Space4}">
-                        <TextBlock Classes="heading" Text="设置" FontSize="{arc:ArcDesignTokenResource Type3XL}" />
-                        <views:JavaSettingsView DataContext="{Binding JavaSettings}" />
-                    </StackPanel>
                 </Grid>
             </ScrollViewer>
 
@@ -232,6 +233,10 @@
                                     MaxWidth="1080" Tag="{arc:ArcDesignTokenResource Space4}"
                                     Margin="{Binding $self.Tag, Converter={StaticResource UniformThicknessConverter}}"
                                     DataContext="{Binding DownloadHub}" />
+            <views:SettingsView x:Name="SettingsPage" Grid.Row="1" IsVisible="False" MaxWidth="1080"
+                                Tag="{arc:ArcDesignTokenResource Space4}"
+                                Margin="{Binding $self.Tag, Converter={StaticResource UniformThicknessConverter}}"
+                                DataContext="{Binding Settings}" />
 
             <arc:ToastStack Grid.Row="1" Label="通知" IsContained="True" />
 

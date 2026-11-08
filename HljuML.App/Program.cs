@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using TKCode.Arc;
+using HljuML.Core.Infrastructure.Settings;
 
 namespace HljuML.App;
 
@@ -23,7 +24,13 @@ class Program
         {
             DisableDefaults = true
         });
-        builder.Logging.AddProvider(new LauncherFileLoggerProvider());
+        var settings = new LauncherSettingsService();
+        var logs = new LauncherFileLoggerProvider(settings);
+        builder.Services.AddSingleton(settings);
+        builder.Services.AddSingleton(logs);
+        builder.Logging.SetMinimumLevel(LogLevel.Trace);
+        builder.Logging.AddFilter((_, level) => level >= settings.Value.MinimumLogLevel);
+        builder.Logging.AddProvider(logs);
         builder.Logging.AddDebug();
         builder.Services.AddCommonServices();
 

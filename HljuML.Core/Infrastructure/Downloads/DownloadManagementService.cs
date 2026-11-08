@@ -7,9 +7,11 @@ using Microsoft.Extensions.Logging;
 
 namespace HljuML.Core.Infrastructure.Downloads;
 
-public sealed partial class DownloadManagementService(ILogger<DownloadManagementService> logger) : BackgroundService
+public sealed partial class DownloadManagementService(ILogger<DownloadManagementService> logger,
+    DownloadTrafficService traffic) : BackgroundService
 {
-    private const int WorkerCount = 4;
+    private const int WorkerCount = 128;
+    public int DownloadConcurrency => traffic.Concurrency;
     private static readonly TimeSpan TransferIdleTimeout = TimeSpan.FromSeconds(60);
     private static readonly StringComparer PathComparer = OperatingSystem.IsWindows()
         ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
@@ -141,6 +143,7 @@ public sealed partial class DownloadManagementService(ILogger<DownloadManagement
 
         try
         {
+            using var slot = await traffic.AcquireAsync(stoppingToken).ConfigureAwait(false);
             stoppingToken.ThrowIfCancellationRequested();
             Report(item with { Status = DownloadItemStatus.Downloading });
             if (File.Exists(path) || Directory.Exists(path))
@@ -171,6 +174,8 @@ public sealed partial class DownloadManagementService(ILogger<DownloadManagement
                 int bytesRead;
                 while ((bytesRead = await source.ReadAsync(buffer, token).ConfigureAwait(false)) > 0)
                 {
+                    timeout.CancelAfter(Timeout.InfiniteTimeSpan);
+                    await traffic.ThrottleAsync(bytesRead, stoppingToken).ConfigureAwait(false);
                     timeout.CancelAfter(TransferIdleTimeout);
                     await destination.WriteAsync(buffer.AsMemory(0, bytesRead), token).ConfigureAwait(false);
                     Report(item with { DownloadedBytes = item.DownloadedBytes + bytesRead });

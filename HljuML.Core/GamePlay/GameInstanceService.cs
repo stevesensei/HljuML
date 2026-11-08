@@ -9,6 +9,8 @@ using ColorMC.Core.Net;
 using ColorMC.Core.Objs;
 using HljuML.Core.GamePlay.Auth;
 using HljuML.Core.Infrastructure.Downloads;
+using HljuML.Core.Infrastructure.Settings;
+using ColorMC.Core.Downloader;
 using HljuML.Core.Infrastructure.Storage;
 using HljuML.Core.Model.Entity;
 using HljuML.Shared.Model;
@@ -19,8 +21,9 @@ using Microsoft.Extensions.Logging;
 
 namespace HljuML.Core.GamePlay;
 
-public sealed class GameInstanceService(IServiceScopeFactory scopeFactory, JavaEnvService javaEnvironments,
+public sealed partial class GameInstanceService(IServiceScopeFactory scopeFactory, JavaEnvService javaEnvironments,
     DownloadManagementService downloads, OperationCoordinatorService coordinatorService,
+    LauncherSettingsService settings, DownloadTrafficService traffic,
     ILogger<GameInstanceService> logger) : IHostedService
 {
     private readonly ConcurrentDictionary<Guid, RunningProcess> _running = new();
@@ -196,6 +199,10 @@ public sealed class GameInstanceService(IServiceScopeFactory scopeFactory, JavaE
 
             var instance = new RunningGameInstance(instanceId, profile.Id, handle.Process.Id, instanceData.Name, args.Auth.UserName,
                 PlayerProfileService.DescribeAuthentication(profile));
+            // 实例窗口设置优先；仅未配置窗口的实例继承全局最大化。
+            if (OperatingSystem.IsWindows() && settings.Value.GameWindow == GameWindowMode.Maximized
+                && game.Window?.FullScreen is null && game.Window?.Width is null && game.Window?.Height is null)
+                _ = MaximizeGameWindowAsync(handle.Process, stoppingToken);
             var running = new RunningProcess(instance, handle);
             handle.Process.Exited += (_, _) => RemoveRunningProcess(running);
             _running[instance.Id] = running;
@@ -360,10 +367,9 @@ public sealed class GameInstanceService(IServiceScopeFactory scopeFactory, JavaE
             CurseForgeKey = "$2a$10$ZEIKK/IxI6VA.RujTLD8vu3YwTVM/Syq6tvaImx1X4U773QzWDGMO"
         });
         
-        var http = ConfigLoad.Config.Http;
-        http.Source = SourceLocal.BMCLAPI;
-        http.DownloadThread = 8;
-        CoreHttpClient.Source = http.Source;
+        settings.AttachFramework();
+        DownloadManager.AcquireDownloadSlot = traffic.AcquireAsync;
+        DownloadManager.ThrottleDownload = traffic.ThrottleAsync;
         ConfigLoad.Save(); // 保存到 Core 数据目录下的 config.json
         
         ColorMCCore.Init1();
