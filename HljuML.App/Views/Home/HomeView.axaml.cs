@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using HljuML.App.Core;
@@ -8,8 +9,13 @@ namespace HljuML.App.Views.Home;
 
 public partial class HomeView : UserControl
 {
-    public HomeView() => InitializeComponent();
-    public System.Collections.Generic.IList<Control> Cards => HomeFeed.Children;
+    public HomeView()
+    {
+        InitializeComponent();
+    }
+
+    public IList<Control> Cards => HomeFeed.Children;
+
     private void OnStopInstanceClicked(object? sender, RoutedEventArgs e)
     {
         if (sender is not ArcButton { DataContext: RunningInstanceRow row } button ||

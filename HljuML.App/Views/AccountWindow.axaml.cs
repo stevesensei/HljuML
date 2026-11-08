@@ -4,7 +4,6 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Data.Common;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -29,24 +28,20 @@ namespace HljuML.App.Views;
 
 public partial class AccountWindow : Window
 {
-    private enum FormStep { Address, Preview, Login, Offline, Role }
+    private readonly List<Bitmap> _avatars = [];
+    private readonly Bitmap _defaultAvatar;
+    private readonly CancellationTokenSource _lifetime = new();
+    private readonly Guid? _requestedReloginId;
 
     private readonly IServiceScopeFactory? _scopes;
-    private readonly CancellationTokenSource _lifetime = new();
-    private readonly Bitmap _defaultAvatar;
-    private readonly List<Bitmap> _avatars = [];
-    private CancellationTokenSource? _formOperation;
-    private TaskCompletionSource<int>? _roleSelection;
-    private ResolvedYggdrasilServer? _preview;
-    private CustomAuthServer? _loginServer;
     private CustomAuthServer? _addedServer;
-    private Guid? _reloginProfileId;
-    private readonly Guid? _requestedReloginId;
+    private CancellationTokenSource? _formOperation;
     private Uri? _homepage;
+    private CustomAuthServer? _loginServer;
+    private ResolvedYggdrasilServer? _preview;
+    private Guid? _reloginProfileId;
+    private TaskCompletionSource<int>? _roleSelection;
     private FormStep _step;
-
-    public ObservableCollection<AccountServerRow> AuthServers { get; } = [];
-    public ObservableCollection<AccountProfileRow> Profiles { get; } = [];
 
     public AccountWindow()
     {
@@ -57,7 +52,13 @@ public partial class AccountWindow : Window
     }
 
     internal AccountWindow(IServiceScopeFactory scopes, Guid? reloginProfileId = null) : this()
-    { _scopes = scopes; _requestedReloginId = reloginProfileId; }
+    {
+        _scopes = scopes;
+        _requestedReloginId = reloginProfileId;
+    }
+
+    public ObservableCollection<AccountServerRow> AuthServers { get; } = [];
+    public ObservableCollection<AccountProfileRow> Profiles { get; } = [];
 
     internal Guid? ReauthenticatedProfileId { get; private set; }
 
@@ -66,14 +67,17 @@ public partial class AccountWindow : Window
         base.OnOpened(e);
         ClipDialogOverlay();
         if (_scopes is null)
+        {
             return;
+        }
 
         var token = _lifetime.Token;
         try
         {
             await using var scope = _scopes.CreateAsyncScope();
             var servers = await scope.ServiceProvider.GetRequiredService<AuthServerService>().GetAllAuthServers(token);
-            var profiles = await scope.ServiceProvider.GetRequiredService<PlayerProfileService>().GetAllPlayerProfiles(token);
+            var profiles = await scope.ServiceProvider.GetRequiredService<PlayerProfileService>()
+                .GetAllPlayerProfiles(token);
             token.ThrowIfCancellationRequested();
             foreach (var server in servers.Data ?? [])
                 AuthServers.Add(new AccountServerRow(server));
@@ -87,22 +91,34 @@ public partial class AccountWindow : Window
             {
                 var row = Profiles.FirstOrDefault(item => item.Id == requested);
                 var server = AuthServers.FirstOrDefault(item => item.Server.Id == row?.AuthServerId)?.Server;
-                if (row is not null && server is not null) OpenLogin(server, row);
-                else ShowAccountError("需要重新登录的档案或认证服务器已被删除，请关闭窗口重新选择。");
+                if (row is not null && server is not null)
+                {
+                    OpenLogin(server, row);
+                }
+                else
+                {
+                    ShowAccountError("需要重新登录的档案或认证服务器已被删除，请关闭窗口重新选择。");
+                }
             }
         }
-        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+        }
         catch (DbException)
         {
             if (!token.IsCancellationRequested)
+            {
                 AccountStatus.Text = "无法读取账户，请关闭后重试。";
+            }
         }
     }
 
     private void ClipDialogOverlay()
     {
         if (OverlayLayer.GetOverlayLayer(this) is not { } overlay)
+        {
             return;
+        }
 
         // Arc places its dialog scrim in the window overlay, outside AccountFrame.
         var clip = new RectangleGeometry();
@@ -118,7 +134,9 @@ public partial class AccountWindow : Window
         AccountFrame.PropertyChanged += (_, change) =>
         {
             if (change.Property == Border.CornerRadiusProperty)
+            {
                 UpdateClip();
+            }
         };
         UpdateClip();
     }
@@ -143,41 +161,70 @@ public partial class AccountWindow : Window
         }
     }
 
-    private void OnCloseClicked(object? sender, RoutedEventArgs e) => Close();
+    private void OnCloseClicked(object? sender, RoutedEventArgs e)
+    {
+        Close();
+    }
 
     private void OnUseProfileClicked(object? sender, RoutedEventArgs e)
     {
-        if (_managingAccount || _requestedReloginId is not null) return;
+        if (_managingAccount || _requestedReloginId is not null)
+        {
+            return;
+        }
+
         if (sender is Control { DataContext: AccountProfileRow profile })
+        {
             Close(profile.Id);
+        }
     }
 
     private void OnAddServerClicked(object? sender, RoutedEventArgs e)
     {
-        if (_managingAccount) return;
+        if (_managingAccount)
+        {
+            return;
+        }
+
         ServerAddress.Text = string.Empty;
         OpenForm(FormStep.Address);
     }
 
     private void OnOfflineClicked(object? sender, RoutedEventArgs e)
     {
-        if (_managingAccount) return;
+        if (_managingAccount)
+        {
+            return;
+        }
+
         OfflineName.Text = string.Empty;
         OpenForm(FormStep.Offline);
     }
 
     private void OnServerClicked(object? sender, RoutedEventArgs e)
     {
-        if (_managingAccount) return;
+        if (_managingAccount)
+        {
+            return;
+        }
+
         if (sender is Control { DataContext: AccountServerRow row })
+        {
             OpenLogin(row.Server);
+        }
     }
 
     private void OnAddedServerClicked(object? sender, RoutedEventArgs e)
     {
-        if (_managingAccount) return;
+        if (_managingAccount)
+        {
+            return;
+        }
+
         if (_addedServer is { } server)
+        {
             OpenLogin(server);
+        }
     }
 
     /// <summary>添加和重新登录共用表单；重新登录只更新既有档案，不再创建重复档案。</summary>
@@ -222,7 +269,8 @@ public partial class AccountWindow : Window
         AccountForm.Description = _reloginProfileId is not null && step is FormStep.Login or FormStep.Role
             ? _requestedReloginId is not null
                 ? "会话已失效。登录成功后继续本次启动，密码仅用于本次登录。"
-                : "重新认证后更新此档案，保留实例关联。密码仅用于本次登录。" : null;
+                : "重新认证后更新此档案，保留实例关联。密码仅用于本次登录。"
+            : null;
         ConfirmButton.Content = step switch
         {
             FormStep.Address => "下一步",
@@ -249,16 +297,25 @@ public partial class AccountWindow : Window
         ServerAddress.Focus();
     }
 
-    private void OnCancelFormClicked(object? sender, RoutedEventArgs e) => AccountForm.Close(null);
+    private void OnCancelFormClicked(object? sender, RoutedEventArgs e)
+    {
+        AccountForm.Close();
+    }
 
     private void OnFormOpened(object? sender, EventArgs e)
     {
         if (_step == FormStep.Address)
+        {
             ServerAddress.Focus();
+        }
         else if (_step == FormStep.Login)
+        {
             LoginAccount.Focus();
+        }
         else if (_step == FormStep.Offline)
+        {
             OfflineName.Focus();
+        }
     }
 
     private void OnFormClosed(object? sender, OverlayClosedEventArgs e)
@@ -272,7 +329,10 @@ public partial class AccountWindow : Window
         LoginPassword.Text = string.Empty;
         RoleList.ItemsSource = null;
         UpdateBusyState();
-        if (_requestedReloginId is not null && ReauthenticatedProfileId is null) Close();
+        if (_requestedReloginId is not null && ReauthenticatedProfileId is null)
+        {
+            Close();
+        }
     }
 
     private async void OnConfirmClicked(object? sender, RoutedEventArgs e)
@@ -285,11 +345,14 @@ public partial class AccountWindow : Window
                 _roleSelection = null;
                 ShowStep(FormStep.Login);
             }
+
             return;
         }
 
         if (_formOperation is not null || _scopes is null)
+        {
             return;
+        }
 
         ClearErrors();
         using var operation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
@@ -313,11 +376,15 @@ public partial class AccountWindow : Window
                     break;
             }
         }
-        catch (OperationCanceledException) when (operation.IsCancellationRequested) { }
+        catch (OperationCanceledException) when (operation.IsCancellationRequested)
+        {
+        }
         catch (Exception ex) when (ex is DbException or DbUpdateException)
         {
             if (!operation.IsCancellationRequested)
+            {
                 SetFormError("无法保存，请重试。");
+            }
         }
         finally
         {
@@ -348,7 +415,9 @@ public partial class AccountWindow : Window
     private async Task SaveServer(AuthServerService service, CancellationToken token)
     {
         if (_preview is not { } preview)
+        {
             return;
+        }
 
         var result = await service.CreateAuthServer(preview, token);
         token.ThrowIfCancellationRequested();
@@ -363,7 +432,7 @@ public partial class AccountWindow : Window
         AddedServerName.Text = server.Name;
         AddedServerAddress.Text = server.Address;
         AddedServerCard.IsVisible = true;
-        AccountForm.Close(null);
+        AccountForm.Close();
     }
 
     private async Task SaveProfile(PlayerProfileService service, CancellationToken token)
@@ -377,6 +446,7 @@ public partial class AccountWindow : Window
                 OfflineName.ErrorMessage = "请输入玩家名。";
                 return;
             }
+
             result = await service.CreatePlayerProfile(new PlayerProfile { PlayerName = name }, token);
         }
         else
@@ -384,11 +454,19 @@ public partial class AccountWindow : Window
             var account = LoginAccount.Text;
             var password = LoginPassword.Text;
             if (string.IsNullOrWhiteSpace(account))
+            {
                 LoginAccount.ErrorMessage = "请输入用户名或邮箱。";
+            }
+
             if (string.IsNullOrEmpty(password))
+            {
                 LoginPassword.ErrorMessage = "请输入密码。";
+            }
+
             if (string.IsNullOrWhiteSpace(account) || string.IsNullOrEmpty(password) || _loginServer is null)
+            {
                 return;
+            }
 
             var selector = new RoleSelector(roles => ChooseRole(roles, token));
             result = _reloginProfileId is { } profileId
@@ -412,7 +490,8 @@ public partial class AccountWindow : Window
             Close(profile.Id);
             return;
         }
-        AccountForm.Close(null);
+
+        AccountForm.Close();
     }
 
     private async Task<int> ChooseRole(List<string> roles, CancellationToken token)
@@ -433,19 +512,25 @@ public partial class AccountWindow : Window
     private void OnRegistrationClicked(object? sender, RoutedEventArgs e)
     {
         if (TryGetWebLink(_loginServer?.RegisterAddress) is { } link)
+        {
             OpenBrowser(link);
+        }
     }
 
     private void OnHomepageClicked(object? sender, RoutedEventArgs e)
     {
         if (_homepage is { } link)
+        {
             OpenBrowser(link);
+        }
     }
 
     private async Task LoadHomepage(CustomAuthServer server, CancellationToken token)
     {
         if (_scopes is null)
+        {
             return;
+        }
 
         try
         {
@@ -453,17 +538,25 @@ public partial class AccountWindow : Window
             var service = scope.ServiceProvider.GetRequiredService<AuthServerService>();
             var result = await service.GetYggdrasilServerMetadata(server.Address, token);
             if (token.IsCancellationRequested || _loginServer != server)
+            {
                 return;
+            }
 
             _homepage = TryGetWebLink(result.Data?.Metadata.Meta?.Links?.Homepage);
             HomepageLink.IsVisible = _homepage is not null;
         }
-        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+        }
     }
 
-    private static Uri? TryGetWebLink(string? address) =>
-        Uri.TryCreate(address, UriKind.Absolute, out var uri) && uri.UserInfo.Length == 0
-        && (uri.Scheme == Uri.UriSchemeHttps || (uri.Scheme == Uri.UriSchemeHttp && uri.IsLoopback)) ? uri : null;
+    private static Uri? TryGetWebLink(string? address)
+    {
+        return Uri.TryCreate(address, UriKind.Absolute, out var uri) && uri.UserInfo.Length == 0
+            && (uri.Scheme == Uri.UriSchemeHttps || (uri.Scheme == Uri.UriSchemeHttp && uri.IsLoopback))
+                ? uri
+                : null;
+    }
 
     private void OpenBrowser(Uri uri)
     {
@@ -489,16 +582,27 @@ public partial class AccountWindow : Window
         var row = new AccountProfileRow(profile.Id, profile.PlayerName, details, _defaultAvatar,
             profile.AuthServerId, profile.PlayerEmail);
         var previous = Profiles.FirstOrDefault(item => item.Id == profile.Id);
-        if (previous is null) Profiles.Add(row);
-        else Profiles[Profiles.IndexOf(previous)] = row;
+        if (previous is null)
+        {
+            Profiles.Add(row);
+        }
+        else
+        {
+            Profiles[Profiles.IndexOf(previous)] = row;
+        }
+
         if (profile.AuthMethod == AuthMethod.Custom)
+        {
             _ = LoadAvatar(profile, row, token);
+        }
     }
 
     private async Task LoadAvatar(PlayerProfile profile, AccountProfileRow row, CancellationToken token)
     {
         if (await PlayerSkinAvatar.LoadAsync(profile, token) is not { } avatar)
+        {
             return;
+        }
 
         var index = Profiles.IndexOf(row);
         if (token.IsCancellationRequested || index < 0)
@@ -513,7 +617,8 @@ public partial class AccountWindow : Window
 
     private void ClearErrors()
     {
-        ServerAddress.ErrorMessage = LoginAccount.ErrorMessage = LoginPassword.ErrorMessage = OfflineName.ErrorMessage = null;
+        ServerAddress.ErrorMessage =
+            LoginAccount.ErrorMessage = LoginPassword.ErrorMessage = OfflineName.ErrorMessage = null;
         FormError.IsVisible = false;
     }
 
@@ -523,14 +628,31 @@ public partial class AccountWindow : Window
         FormError.IsVisible = true;
     }
 
+    private enum FormStep
+    {
+        Address,
+        Preview,
+        Login,
+        Offline,
+        Role
+    }
+
     private sealed class RoleSelector(Func<List<string>, Task<int>> select) : ILoginGui
     {
-        public Task<int> SelectAuth(List<string> items) => select(items);
+        public Task<int> SelectAuth(List<string> items)
+        {
+            return select(items);
+        }
     }
 }
 
-public sealed record AccountProfileRow(Guid Id, string Name, string Details, Bitmap Avatar,
-    Guid? AuthServerId = null, string? Account = null)
+public sealed record AccountProfileRow(
+    Guid Id,
+    string Name,
+    string Details,
+    Bitmap Avatar,
+    Guid? AuthServerId = null,
+    string? Account = null)
 {
     public bool CanRelogin => AuthServerId is not null;
 }
@@ -538,5 +660,6 @@ public sealed record AccountProfileRow(Guid Id, string Name, string Details, Bit
 public sealed record AccountServerRow(CustomAuthServer Server)
 {
     public string Host => Uri.TryCreate(Server.Address, UriKind.Absolute, out var uri)
-        ? uri.Authority : Server.Address;
+        ? uri.Authority
+        : Server.Address;
 }

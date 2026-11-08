@@ -45,22 +45,46 @@ public sealed partial class JavaEnvService : BackgroundService
 
     public IReadOnlyList<JavaInfoObj> Environments
     {
-        get { lock (_sync) return _environments; }
+        get
+        {
+            lock (_sync)
+            {
+                return _environments;
+            }
+        }
     }
 
     public string DefaultJavaPath
     {
-        get { lock (_sync) return JavaExecutablePreference.PreferWindowed(_defaultJavaPath); }
+        get
+        {
+            lock (_sync)
+            {
+                return JavaExecutablePreference.PreferWindowed(_defaultJavaPath);
+            }
+        }
     }
 
     public bool IsScanning
     {
-        get { lock (_sync) return _isScanning; }
+        get
+        {
+            lock (_sync)
+            {
+                return _isScanning;
+            }
+        }
     }
 
     public string? ScanError
     {
-        get { lock (_sync) return _scanError; }
+        get
+        {
+            lock (_sync)
+            {
+                return _scanError;
+            }
+        }
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -69,7 +93,9 @@ public sealed partial class JavaEnvService : BackgroundService
         {
             await ScanAsync(stoppingToken);
         }
-        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+        }
     }
 
     public Task<IReadOnlyList<JavaInfoObj>> ScanAsync(CancellationToken cancellationToken = default)
@@ -83,8 +109,10 @@ public sealed partial class JavaEnvService : BackgroundService
                 _isScanning = true;
                 _scanTask = Task.Run(ScanCoreAsync);
             }
+
             scan = _scanTask!;
         }
+
         Changed?.Invoke();
         return scan.WaitAsync(cancellationToken);
     }
@@ -95,17 +123,29 @@ public sealed partial class JavaEnvService : BackgroundService
         {
             var found = await JavaHelper.FindJava() ?? [];
             List<string> paths;
-            lock (_sync) paths = [_defaultJavaPath, .. _manualJavaPaths];
+            lock (_sync)
+            {
+                paths = [_defaultJavaPath, .. _manualJavaPaths];
+            }
+
             if (Environment.GetEnvironmentVariable("JAVA_HOME") is { Length: > 0 } javaHome)
+            {
                 paths.Add(JavaExecutablePreference.PreferWindowed(
                     Path.Combine(javaHome, "bin", OperatingSystem.IsWindows() ? "java.exe" : "java")));
+            }
+
             if (Directory.Exists(JvmPath.JavaDir))
+            {
                 found.AddRange(await Task.Run(() => JavaHelper.FindJava(JvmPath.JavaDir) ?? []));
+            }
 
             foreach (var path in paths.Where(File.Exists))
             {
-                if (await Task.Run(() => JavaHelper.GetJavaInfo(JavaExecutablePreference.PreferWindowed(path))) is { } java)
+                if (await Task.Run(() => JavaHelper.GetJavaInfo(JavaExecutablePreference.PreferWindowed(path))) is
+                    { } java)
+                {
                     found.Add(java);
+                }
             }
 
             var comparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
@@ -116,7 +156,8 @@ public sealed partial class JavaEnvService : BackgroundService
                 .ThenBy(java => java.Version).ThenBy(java => java.Path, comparer).ToArray();
             lock (_sync)
             {
-                _environments = environments.Concat(_environments.Where(java => _manualJavaPaths.Contains(java.Path, comparer)))
+                _environments = environments
+                    .Concat(_environments.Where(java => _manualJavaPaths.Contains(java.Path, comparer)))
                     .Where(java => File.Exists(java.Path))
                     .Select(java => java with { Path = JavaExecutablePreference.PreferWindowed(java.Path) })
                     .DistinctBy(java => Path.GetFullPath(java.Path), comparer)
@@ -129,12 +170,20 @@ public sealed partial class JavaEnvService : BackgroundService
         catch (Exception error)
         {
             _logger.LogWarning(error, "Could not scan Java environments");
-            lock (_sync) _scanError = "扫描 Java 失败，请检查安装目录权限后重试。";
+            lock (_sync)
+            {
+                _scanError = "扫描 Java 失败，请检查安装目录权限后重试。";
+            }
+
             return Environments;
         }
         finally
         {
-            lock (_sync) _isScanning = false;
+            lock (_sync)
+            {
+                _isScanning = false;
+            }
+
             Changed?.Invoke();
         }
     }
@@ -145,13 +194,17 @@ public sealed partial class JavaEnvService : BackgroundService
         lock (_sync)
         {
             if (path.Length > 0 && (!Path.IsPathFullyQualified(path) || !File.Exists(path)
-                || !_environments.Any(java => string.Equals(java.Path, path, OperatingSystem.IsWindows()
-                    ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))))
+                    || !_environments.Any(java => string.Equals(java.Path, path, OperatingSystem.IsWindows()
+                        ? StringComparison.OrdinalIgnoreCase
+                        : StringComparison.Ordinal))))
+            {
                 throw new ArgumentException("请选择扫描到的可用 Java 环境。", nameof(path));
+            }
 
             SavePreferences(path, _manualJavaPaths);
             _defaultJavaPath = path;
         }
+
         Changed?.Invoke();
     }
 
@@ -159,7 +212,8 @@ public sealed partial class JavaEnvService : BackgroundService
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(minecraftVersion);
-        if (minecraftVersion.IndexOfAny(['/', '\\']) >= 0 || minecraftVersion.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0
+        if (minecraftVersion.IndexOfAny(['/', '\\']) >= 0
+            || minecraftVersion.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0
             || minecraftVersion is "." or "..")
         {
             throw new ArgumentException("Invalid Minecraft version.", nameof(minecraftVersion));
@@ -181,7 +235,9 @@ public sealed partial class JavaEnvService : BackgroundService
 
         var registered = FindRegisteredJava(majorVersion);
         if (registered?.MajorVersion == majorVersion)
+        {
             return registered;
+        }
 
         var javaHome = Environment.GetEnvironmentVariable("JAVA_HOME");
         JavaInfoObj? fromEnvironment = null;
@@ -191,13 +247,22 @@ public sealed partial class JavaEnvService : BackgroundService
                 Path.Combine(javaHome, "bin", OperatingSystem.IsWindows() ? "java.exe" : "java"));
             fromEnvironment = await Task.Run(() => JavaHelper.GetJavaInfo(executable), cancellationToken);
             if (fromEnvironment?.MajorVersion == majorVersion)
+            {
                 return fromEnvironment;
+            }
         }
 
         IReadOnlyList<JavaInfoObj> discovered;
-        lock (_sync) discovered = _environments;
+        lock (_sync)
+        {
+            discovered = _environments;
+        }
+
         if (discovered.Count == 0 || IsScanning)
+        {
             discovered = await ScanAsync(cancellationToken);
+        }
+
         cancellationToken.ThrowIfCancellationRequested();
         var candidates = discovered.Concat(new[] { registered, fromEnvironment }).OfType<JavaInfoObj>();
         return MatchInstalledJava(candidates, majorVersion);
@@ -208,9 +273,12 @@ public sealed partial class JavaEnvService : BackgroundService
         try
         {
             if (JvmPath.FindJava(majorVersion) is { } java && java.GetPath() is { } path && File.Exists(path))
+            {
                 return java with { Path = JavaExecutablePreference.PreferWindowed(path) };
+            }
 
-            return MatchInstalledJava(JvmPath.Jvms.Values.Select(item => item with { Path = item.GetPath() }), majorVersion);
+            return MatchInstalledJava(JvmPath.Jvms.Values.Select(item => item with { Path = item.GetPath() }),
+                majorVersion);
         }
         catch (InvalidOperationException)
         {
@@ -220,14 +288,17 @@ public sealed partial class JavaEnvService : BackgroundService
         return null;
     }
 
-    private static JavaInfoObj? MatchInstalledJava(IEnumerable<JavaInfoObj> candidates, int majorVersion) => candidates
-        .Select(item => item with { Path = JavaExecutablePreference.PreferWindowed(item.Path) })
-        .Where(item => File.Exists(item.Path) && (item.MajorVersion == majorVersion
-            || majorVersion > 8 && item.MajorVersion > majorVersion))
-        .OrderByDescending(item => item.MajorVersion == majorVersion)
-        .ThenByDescending(item => item.Arch == SystemInfo.SystemArch)
-        .ThenByDescending(item => item.MajorVersion)
-        .FirstOrDefault();
+    private static JavaInfoObj? MatchInstalledJava(IEnumerable<JavaInfoObj> candidates, int majorVersion)
+    {
+        return candidates
+            .Select(item => item with { Path = JavaExecutablePreference.PreferWindowed(item.Path) })
+            .Where(item => File.Exists(item.Path) && (item.MajorVersion == majorVersion
+                || (majorVersion > 8 && item.MajorVersion > majorVersion)))
+            .OrderByDescending(item => item.MajorVersion == majorVersion)
+            .ThenByDescending(item => item.Arch == SystemInfo.SystemArch)
+            .ThenByDescending(item => item.MajorVersion)
+            .FirstOrDefault();
+    }
 
     private sealed record JavaPreferences(string DefaultJavaPath, IReadOnlyList<string>? ManualJavaPaths = null);
 }

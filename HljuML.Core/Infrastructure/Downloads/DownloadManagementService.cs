@@ -7,14 +7,18 @@ using Microsoft.Extensions.Logging;
 
 namespace HljuML.Core.Infrastructure.Downloads;
 
-public sealed partial class DownloadManagementService(ILogger<DownloadManagementService> logger,
+public sealed partial class DownloadManagementService(
+    ILogger<DownloadManagementService> logger,
     DownloadTrafficService traffic) : BackgroundService
 {
     private const int WorkerCount = 128;
     public int DownloadConcurrency => traffic.Concurrency;
     private static readonly TimeSpan TransferIdleTimeout = TimeSpan.FromSeconds(60);
+
     private static readonly StringComparer PathComparer = OperatingSystem.IsWindows()
-        ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+        ? StringComparer.OrdinalIgnoreCase
+        : StringComparer.Ordinal;
+
     private static readonly HttpClient Client = new(new SocketsHttpHandler
     {
         PooledConnectionLifetime = TimeSpan.FromMinutes(5),
@@ -30,7 +34,9 @@ public sealed partial class DownloadManagementService(ILogger<DownloadManagement
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(request.Name);
         if (request.Files.Count == 0)
+        {
             throw new ArgumentException("下载请求至少需要一个文件。", nameof(request));
+        }
 
         var job = new DownloadJob(request.Name);
         var files = new List<QueuedFile>(request.Files.Count);
@@ -39,15 +45,25 @@ public sealed partial class DownloadManagementService(ILogger<DownloadManagement
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(file.Name);
             if (!file.Source.IsAbsoluteUri || file.Source.Scheme is not ("http" or "https"))
+            {
                 throw new ArgumentException("下载地址必须是 HTTP 或 HTTPS 地址。", nameof(request));
+            }
+
             if (!Path.IsPathFullyQualified(file.DestinationPath))
+            {
                 throw new ArgumentException("下载目标必须使用绝对文件路径。", nameof(request));
+            }
 
             var path = Path.GetFullPath(file.DestinationPath);
             if (string.IsNullOrEmpty(Path.GetFileName(path)))
+            {
                 throw new ArgumentException("下载目标必须包含文件名。", nameof(request));
+            }
+
             if (!paths.Add(path))
+            {
                 throw new ArgumentException("请求中包含重复的下载目标。", nameof(request));
+            }
 
             var item = new DownloadItemSnapshot(Guid.NewGuid(), file.Name, path);
             job.Items.Add(item.Id, item);
@@ -58,9 +74,14 @@ public sealed partial class DownloadManagementService(ILogger<DownloadManagement
         lock (_sync)
         {
             if (paths.Overlaps(_reservedPaths))
+            {
                 throw new InvalidOperationException("已有下载请求使用同一个目标路径。");
+            }
+
             if (!_queue.Writer.TryWrite(new QueuedDownload(job, files)))
+            {
                 throw new InvalidOperationException("下载服务已停止接收请求。");
+            }
 
             _jobs.Add(job.Id, job);
             _reservedPaths.UnionWith(paths);
@@ -73,31 +94,47 @@ public sealed partial class DownloadManagementService(ILogger<DownloadManagement
     public DownloadSnapshot? GetDownload(Guid id)
     {
         lock (_sync)
+        {
             return _jobs.TryGetValue(id, out var job) ? job.Snapshot() : null;
+        }
     }
 
     public IReadOnlyList<DownloadSnapshot> GetActiveDownloads()
     {
         lock (_sync)
+        {
             return _jobs.Values.Where(job => job.IsActive).Select(job => job.Snapshot()).ToArray();
+        }
     }
 
     public int GetActiveDownloadCount()
     {
         lock (_sync)
+        {
             return _jobs.Values.Count(job => job.IsActive);
+        }
     }
 
-    protected override Task ExecuteAsync(CancellationToken stoppingToken) =>
-        Task.WhenAll(Enumerable.Range(0, WorkerCount).Select(_ => RunWorkerAsync(stoppingToken)));
+    protected override Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        return Task.WhenAll(Enumerable.Range(0, WorkerCount).Select(_ => RunWorkerAsync(stoppingToken)));
+    }
 
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
         lock (_sync)
+        {
             _queue.Writer.TryComplete();
+        }
 
-        try { await base.StopAsync(cancellationToken).ConfigureAwait(false); }
-        finally { ColorMCCore.Error -= LogColorMcError; }
+        try
+        {
+            await base.StopAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            ColorMCCore.Error -= LogColorMcError;
+        }
     }
 
     private async Task RunWorkerAsync(CancellationToken stoppingToken)
@@ -106,7 +143,9 @@ public sealed partial class DownloadManagementService(ILogger<DownloadManagement
         {
             var job = request.Job;
             lock (_sync)
+            {
                 job.Status = DownloadStatus.Running;
+            }
 
             foreach (var file in request.Files)
                 await DownloadFileAsync(job, file, stoppingToken).ConfigureAwait(false);
@@ -117,11 +156,17 @@ public sealed partial class DownloadManagementService(ILogger<DownloadManagement
                     _reservedPaths.Remove(file.Item.DestinationPath);
 
                 if (job.Items.Values.Any(item => item.Status == DownloadItemStatus.Canceled))
+                {
                     FinishJob(job, DownloadStatus.Canceled, "下载已取消。");
+                }
                 else if (job.Items.Values.Any(item => item.Status == DownloadItemStatus.Failed))
+                {
                     FinishJob(job, DownloadStatus.Failed, "部分文件下载失败。");
+                }
                 else
+                {
                     FinishJob(job, DownloadStatus.Succeeded);
+                }
             }
         }
     }
@@ -138,7 +183,9 @@ public sealed partial class DownloadManagementService(ILogger<DownloadManagement
         {
             item = update;
             lock (_sync)
+            {
                 job.Items[item.Id] = item;
+            }
         }
 
         try
@@ -161,12 +208,14 @@ public sealed partial class DownloadManagementService(ILogger<DownloadManagement
                 .ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
             if (response.StatusCode == HttpStatusCode.PartialContent)
+            {
                 throw new IOException("Unexpected partial response for a full download.");
+            }
 
             Report(item with { TotalBytes = response.Content.Headers.ContentLength });
             Directory.CreateDirectory(directory);
             await using (var destination = new FileStream(temporaryPath, FileMode.CreateNew, FileAccess.Write,
-                FileShare.None, bufferSize: 64 * 1024, useAsync: true))
+                             FileShare.None, 64 * 1024, true))
             {
                 ownsTemporaryFile = true;
                 await using var source = await response.Content.ReadAsStreamAsync(token).ConfigureAwait(false);
@@ -182,7 +231,9 @@ public sealed partial class DownloadManagementService(ILogger<DownloadManagement
                 }
 
                 if (item.TotalBytes is { } expected && item.DownloadedBytes != expected)
+                {
                     throw new IOException("The downloaded length did not match the response length.");
+                }
 
                 await destination.FlushAsync(token).ConfigureAwait(false);
             }
@@ -197,9 +248,10 @@ public sealed partial class DownloadManagementService(ILogger<DownloadManagement
             Report(item with { Status = DownloadItemStatus.Canceled });
         }
         catch (Exception error) when (error is HttpRequestException or IOException or UnauthorizedAccessException
-            or OperationCanceledException or ArgumentException or NotSupportedException)
+                                          or OperationCanceledException or ArgumentException or NotSupportedException)
         {
-            logger.LogError(error, "下载失败：{DownloadId}/{DownloadItemId}；文件 {FileName}；来源 {Source}；目标 {Destination}；已下载 {DownloadedBytes}/{TotalBytes} 字节",
+            logger.LogError(error,
+                "下载失败：{DownloadId}/{DownloadItemId}；文件 {FileName}；来源 {Source}；目标 {Destination}；已下载 {DownloadedBytes}/{TotalBytes} 字节",
                 job.Id, item.Id, item.Name, GetLogSource(file.Source.AbsoluteUri), path,
                 item.DownloadedBytes, item.TotalBytes);
             var message = error switch
@@ -229,7 +281,10 @@ public sealed partial class DownloadManagementService(ILogger<DownloadManagement
     private void FinishJob(DownloadJob job, DownloadStatus status, string? error = null)
     {
         if (!job.IsActive)
+        {
             return;
+        }
+
         job.Status = status;
         job.Error = error;
         if (status == DownloadStatus.Succeeded)
@@ -237,10 +292,12 @@ public sealed partial class DownloadManagementService(ILogger<DownloadManagement
             job.Summary = job.Snapshot() with { Items = Array.Empty<DownloadItemSnapshot>() };
             job.Items.Clear();
         }
+
         job.Batches.Clear();
     }
 
     private sealed record QueuedDownload(DownloadJob Job, IReadOnlyList<QueuedFile> Files);
+
     private sealed record QueuedFile(Uri Source, DownloadItemSnapshot Item);
 
     private sealed class DownloadJob(string name, Guid? instanceId = null)
@@ -259,14 +316,18 @@ public sealed partial class DownloadManagementService(ILogger<DownloadManagement
         internal DownloadSnapshot Snapshot()
         {
             if (Summary is not null)
+            {
                 return Summary;
+            }
+
             var items = Items.Values.ToArray();
             var totalBytes = items.Length == TotalFiles && items.All(item => item.TotalBytes.HasValue)
-                ? items.Sum(item => item.TotalBytes) : null;
+                ? items.Sum(item => item.TotalBytes)
+                : null;
             return new DownloadSnapshot(Id, name, instanceId, Status, TotalFiles,
-                items.Count(item => item.Status == DownloadItemStatus.Succeeded),
-                items.Count(item => item.Status == DownloadItemStatus.Failed),
-                items.Sum(item => item.DownloadedBytes), totalBytes, Array.AsReadOnly(items), Error)
+                    items.Count(item => item.Status == DownloadItemStatus.Succeeded),
+                    items.Count(item => item.Status == DownloadItemStatus.Failed),
+                    items.Sum(item => item.DownloadedBytes), totalBytes, Array.AsReadOnly(items), Error)
                 { Phase = Phase };
         }
     }

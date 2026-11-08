@@ -1,16 +1,16 @@
 ﻿using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.Data.Common;
+using System.Text.Json;
 using ColorMC.Core;
 using ColorMC.Core.Config;
+using ColorMC.Core.Downloader;
 using ColorMC.Core.Game;
 using ColorMC.Core.LaunchPath;
-using ColorMC.Core.Net;
 using ColorMC.Core.Objs;
 using HljuML.Core.GamePlay.Auth;
 using HljuML.Core.Infrastructure.Downloads;
 using HljuML.Core.Infrastructure.Settings;
-using ColorMC.Core.Downloader;
 using HljuML.Core.Infrastructure.Storage;
 using HljuML.Core.Model.Entity;
 using HljuML.Shared.Model;
@@ -21,17 +21,23 @@ using Microsoft.Extensions.Logging;
 
 namespace HljuML.Core.GamePlay;
 
-public sealed partial class GameInstanceService(IServiceScopeFactory scopeFactory, JavaEnvService javaEnvironments,
-    DownloadManagementService downloads, OperationCoordinatorService coordinatorService,
-    LauncherSettingsService settings, DownloadTrafficService traffic,
+public sealed partial class GameInstanceService(
+    IServiceScopeFactory scopeFactory,
+    JavaEnvService javaEnvironments,
+    DownloadManagementService downloads,
+    OperationCoordinatorService coordinatorService,
+    LauncherSettingsService settings,
+    DownloadTrafficService traffic,
     ILogger<GameInstanceService> logger) : IHostedService
 {
     private readonly ConcurrentDictionary<Guid, RunningProcess> _running = new();
 
     public event Action? RunningInstancesChanged;
 
-    public IReadOnlyList<RunningGameInstance> GetRunningInstances() =>
-        _running.Values.Select(process => process.Instance).OrderBy(instance => instance.ProcessId).ToArray();
+    public IReadOnlyList<RunningGameInstance> GetRunningInstances()
+    {
+        return _running.Values.Select(process => process.Instance).OrderBy(instance => instance.ProcessId).ToArray();
+    }
 
     public async Task<IReadOnlyList<GameInstanceData>> GetGameInstances(CancellationToken cancellationToken = default)
     {
@@ -39,7 +45,9 @@ public sealed partial class GameInstanceService(IServiceScopeFactory scopeFactor
         var db = scope.ServiceProvider.GetRequiredService<HljuMLDbContext>();
         var instances = await db.GameInstances.AsNoTracking().Include(instance => instance.GameFolder)
             .OrderByDescending(instance => instance.LastLogin)
-            .ThenBy(instance => instance.Name).ThenBy(instance => instance.Id).ToListAsync(cancellationToken);
+            .ThenBy(instance => instance.Name)
+            .ThenBy(instance => instance.Id)
+            .ToListAsync(cancellationToken);
         return instances.Where(instance => !File.Exists(Path.Combine(
             instance.GameFolder?.AbsolutePath ?? LauncherPaths.DefaultInstanceDirectory,
             $"hljuml-{instance.Id:N}", GameInstallationService.PendingMarker))).ToArray();
@@ -49,14 +57,18 @@ public sealed partial class GameInstanceService(IServiceScopeFactory scopeFactor
     {
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<HljuMLDbContext>();
-        return await db.GameFolders.AsNoTracking().OrderBy(folder => folder.Name).ThenBy(folder => folder.AbsolutePath)
+        return await db.GameFolders.AsNoTracking()
+            .OrderBy(folder => folder.Name)
+            .ThenBy(folder => folder.AbsolutePath)
             .ToListAsync(cancellationToken);
     }
 
     public async Task<ServiceResult<GameFolder>> AddGameFolderAsync(string path, CancellationToken token = default)
     {
         if (!Path.IsPathFullyQualified(path) || !Directory.Exists(path))
+        {
             return ServiceResult<GameFolder>.FailureResult(message: "请选择可访问的游戏文件夹。");
+        }
 
         path = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
         try
@@ -71,8 +83,11 @@ public sealed partial class GameInstanceService(IServiceScopeFactory scopeFactor
             if (folder is null)
             {
                 var name = LauncherPaths.IsDefaultInstanceDirectory(path) ? "默认实例目录" : Path.GetFileName(path);
-                folder = new GameFolder { Id = Guid.NewGuid(), AbsolutePath = path,
-                    Name = string.IsNullOrEmpty(name) ? path : name };
+                folder = new GameFolder
+                {
+                    Id = Guid.NewGuid(), AbsolutePath = path,
+                    Name = string.IsNullOrEmpty(name) ? path : name
+                };
                 db.GameFolders.Add(folder);
             }
 
@@ -81,18 +96,24 @@ public sealed partial class GameInstanceService(IServiceScopeFactory scopeFactor
             {
                 var game = group.First();
                 if (!registered.Add(game.UUID))
+                {
                     continue;
+                }
 
-                db.GameInstances.Add(new GameInstanceData { Id = game.UUID, GameFolderId = folder.Id,
+                db.GameInstances.Add(new GameInstanceData
+                {
+                    Id = game.UUID, GameFolderId = folder.Id,
                     Name = string.IsNullOrWhiteSpace(game.Name) ? Path.GetFileName(game.DirName) : game.Name,
-                    Version = game.Version, Loader = game.Loader });
+                    Version = game.Version, Loader = game.Loader
+                });
             }
 
             await db.SaveChangesAsync(token);
             await transaction.CommitAsync(token);
             return ServiceResult<GameFolder>.SuccessResult(folder);
         }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException or DbException or DbUpdateException)
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or DbException
+                                          or DbUpdateException)
         {
             logger.LogWarning(error, "Failed to register a game folder");
             return ServiceResult<GameFolder>.FailureResult(message: "无法添加目录，请检查目录权限后重试。");
@@ -106,31 +127,39 @@ public sealed partial class GameInstanceService(IServiceScopeFactory scopeFactor
         {
             using var operation = await coordinatorService.EnterAsync(stoppingToken);
             if (_running.ContainsKey(instanceId))
+            {
                 return ServiceResult<int?>.FailureResult(message: "该实例已经在运行。");
+            }
 
-            progress?.Report(new("正在读取实例和玩家档案"));
+            progress?.Report(new GameLaunchProgress("正在读取实例和玩家档案"));
             await using var scope = scopeFactory.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<HljuMLDbContext>();
             var profiles = scope.ServiceProvider.GetRequiredService<PlayerProfileService>();
             var instanceData = await db.GameInstances.AsNoTracking().Include(item => item.GameFolder)
                 .SingleOrDefaultAsync(item => item.Id == instanceId, stoppingToken);
             if (instanceData is null || instanceId == Guid.Empty)
+            {
                 return ServiceResult<int?>.FailureResult(message: "找不到所选游戏实例。");
+            }
 
             var profileResult = await profiles.GetPlayerProfile(profileId, stoppingToken);
             if (profileResult.Data is not { } profile)
+            {
                 return ServiceResult<int?>.FailureResult(message: profileResult.Message);
+            }
 
             var gameResult = await ResolveGame(instanceData, progress, stoppingToken);
             if (gameResult.Data is not { } game)
+            {
                 return ServiceResult<int?>.FailureResult(message: gameResult.Message);
+            }
 
             using var resources = instanceData.GameFolder is { } folder
                 && InstanceFolderService.GetResourceDirectory(folder.AbsolutePath) is { } resourceDirectory
-                ? MinecraftPath.UseResourceDirectory(resourceDirectory)
-                : null;
+                    ? MinecraftPath.UseResourceDirectory(resourceDirectory)
+                    : null;
 
-            progress?.Report(new("正在检查实例所需的 Java 版本"));
+            progress?.Report(new GameLaunchProgress("正在检查实例所需的 Java 版本"));
             JavaLaunchSelection? selection;
             int requiredJava;
             try
@@ -139,42 +168,62 @@ public sealed partial class GameInstanceService(IServiceScopeFactory scopeFactor
                 selection = await javaEnvironments.SelectForLaunchAsync(game, requiredJava, stoppingToken);
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException
-                or System.Text.Json.JsonException or ArgumentException)
+                                              or JsonException or ArgumentException)
             {
                 logger.LogWarning(error, "无法检查实例 {InstanceId} 的 Java 环境", instanceId);
                 return ServiceResult<int?>.FailureResult(message: $"无法检查 Java 环境：{error.Message}");
             }
+
             if (selection is null)
+            {
                 return ServiceResult<int?>.FailureResult(message:
                     $"实例至少需要 Java {requiredJava}，Java 列表中没有满足要求的可用环境。请安装后在设置中扫描或手动添加 Java，再重新启动。");
+            }
 
             // 传入确定的路径，防止 ColorMC 再次按自己的规则选用较低或差值更大的版本。
             game = game with { JvmLocal = selection.Java.Path, JvmName = null };
             logger.LogInformation("实例 {InstanceId} 推荐 Java {Required}，本次使用 Java {Selected}：{Path}",
                 instanceId, requiredJava, selection.Java.MajorVersion, selection.Java.Path);
             if (profile.AuthMethod == AuthMethod.Custom)
-                progress?.Report(new("正在刷新外置登录"));
+            {
+                progress?.Report(new GameLaunchProgress("正在刷新外置登录"));
+            }
+
             var loginResult = await profiles.GetLaunchLogin(profile, stoppingToken);
             if (loginResult.Data is not { } login)
-                return ServiceResult<int?>.FailureResult(message: loginResult.Message, errorCode: loginResult.ErrorCode);
-            progress?.Report(new($"已选择 Java {selection.Java.MajorVersion}", JavaWarning: selection.NeedsWarning
-                ? new JavaVersionWarning(selection.Java.MajorVersion, requiredJava) : null));
+            {
+                return ServiceResult<int?>.FailureResult(message: loginResult.Message,
+                    errorCode: loginResult.ErrorCode);
+            }
+
+            progress?.Report(new GameLaunchProgress($"已选择 Java {selection.Java.MajorVersion}",
+                JavaWarning: selection.NeedsWarning
+                    ? new JavaVersionWarning(selection.Java.MajorVersion, requiredJava)
+                    : null));
 
             var reporter = progress is null ? null : new GameLaunchReporter(progress);
             // 外置会话已经由应用刷新并持久化，核心只复用；微软会话仍沿用核心的刷新流程。
-            var args = new GameLaunchArg { Auth = login, Gui = reporter,
-                AuthAlreadyRefreshed = profile.AuthMethod == AuthMethod.Custom };
+            var args = new GameLaunchArg
+            {
+                Auth = login, Gui = reporter,
+                AuthAlreadyRefreshed = profile.AuthMethod == AuthMethod.Custom
+            };
             var trackRefresh = profile.AuthMethod != AuthMethod.Offline;
             var refreshed = false;
+
             void OnGameLog(GameLogEventArgs evt)
             {
                 // StartGameAsync refreshes the token before starting the process and emits LoginTime after success.
                 if (evt.Game.UUID == instanceId && evt.LogItem?.LogType == GameSystemLog.LoginTime)
+                {
                     refreshed = true;
+                }
             }
 
             if (trackRefresh)
+            {
                 ColorMCCore.GameLog += OnGameLog;
+            }
 
             GameHandle? handle;
             try
@@ -189,7 +238,9 @@ public sealed partial class GameInstanceService(IServiceScopeFactory scopeFactor
                 {
                     ColorMCCore.GameLog -= OnGameLog;
                     if (refreshed)
+                    {
                         await SaveLoginAfterLaunch(profiles, profile, args);
+                    }
                 }
             }
 
@@ -199,12 +250,16 @@ public sealed partial class GameInstanceService(IServiceScopeFactory scopeFactor
                 return ServiceResult<int?>.FailureResult(message: "游戏进程未启动。");
             }
 
-            var instance = new RunningGameInstance(instanceId, profile.Id, handle.Process.Id, instanceData.Name, args.Auth.UserName,
+            var instance = new RunningGameInstance(instanceId, profile.Id, handle.Process.Id, instanceData.Name,
+                args.Auth.UserName,
                 PlayerProfileService.DescribeAuthentication(profile));
             // 实例窗口设置优先；仅未配置窗口的实例继承全局最大化。
             if (OperatingSystem.IsWindows() && settings.Value.GameWindow == GameWindowMode.Maximized
                 && game.Window?.FullScreen is null && game.Window?.Width is null && game.Window?.Height is null)
+            {
                 _ = MaximizeGameWindowAsync(handle.Process, stoppingToken);
+            }
+
             var running = new RunningProcess(instance, handle);
             handle.Process.Exited += (_, _) => RemoveRunningProcess(running);
             _running[instance.Id] = running;
@@ -228,7 +283,7 @@ public sealed partial class GameInstanceService(IServiceScopeFactory scopeFactor
             return ServiceResult<int?>.FailureResult(message: e.State switch
             {
                 LaunchError.AuthLoginFail => "玩家认证失败，请重新登录。",
-                LaunchError.JavaNotFound  => "找不到所需的 Java，请配置兼容的运行环境。",
+                LaunchError.JavaNotFound => "找不到所需的 Java，请配置兼容的运行环境。",
                 LaunchError.SelectJavaNotFound => "找不到所选的 Java，请检查运行环境配置。",
                 LaunchError.DownloadFileError => "游戏文件下载失败，请检查网络后重试。",
                 LaunchError.VersionError => "实例缺少可用的版本或加载器配置。",
@@ -246,10 +301,15 @@ public sealed partial class GameInstanceService(IServiceScopeFactory scopeFactor
         IProgress<GameLaunchProgress>? progress, CancellationToken cancellationToken)
     {
         if (File.Exists(Path.Combine(instance.GameFolder?.AbsolutePath ?? LauncherPaths.DefaultInstanceDirectory,
-            $"hljuml-{instance.Id:N}", GameInstallationService.PendingMarker)))
+                $"hljuml-{instance.Id:N}", GameInstallationService.PendingMarker)))
+        {
             return ServiceResult<GameSettingObj>.FailureResult(message: "实例尚未完成安装登记，请检查下载管理器。");
+        }
+
         if (instance.GameFolder is { } folder && !LauncherPaths.IsDefaultInstanceDirectory(folder.AbsolutePath))
+        {
             return await InstanceFolderService.ResolveAsync(instance, folder.AbsolutePath, progress, cancellationToken);
+        }
 
         if (InstancesPath.GetGame(instance.Id) is { } existing)
         {
@@ -261,13 +321,20 @@ public sealed partial class GameInstanceService(IServiceScopeFactory scopeFactor
         if (Directory.Exists(LauncherPaths.DefaultInstanceDirectory)
             && InstanceFolderService.ReadInstances(LauncherPaths.DefaultInstanceDirectory, cancellationToken)
                 .Any(game => game.UUID == instance.Id))
+        {
             return await InstanceFolderService.ResolveAsync(instance, LauncherPaths.DefaultInstanceDirectory,
                 progress, cancellationToken);
+        }
 
         if (instance.Loader != Loaders.Normal)
+        {
             return ServiceResult<GameSettingObj>.FailureResult(message: "请为此加载器准备同 ID 的 ColorMC 实例配置。");
+        }
+
         if (string.IsNullOrWhiteSpace(instance.Version))
+        {
             return ServiceResult<GameSettingObj>.FailureResult(message: "请填写实例的原版游戏版本。");
+        }
 
         var directory = $"hljuml-{instance.Id:N}";
         var newGame = new GameSettingObj
@@ -279,14 +346,14 @@ public sealed partial class GameInstanceService(IServiceScopeFactory scopeFactor
             Loader = instance.Loader
         };
         if (Path.Exists(newGame.GetBasePath()) || InstancesPath.Games.Any(item =>
-            string.Equals(item.DirName, directory, StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(item.Name, directory, StringComparison.OrdinalIgnoreCase)))
+                string.Equals(item.DirName, directory, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(item.Name, directory, StringComparison.OrdinalIgnoreCase)))
         {
             return ServiceResult<GameSettingObj>.FailureResult(message: "实例目录已存在，请检查 ColorMC 实例配置。");
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        progress?.Report(new("正在初始化原版实例"));
+        progress?.Report(new GameLaunchProgress("正在初始化原版实例"));
         var created = await InstancesPath.CreateGameAsync(newGame, null);
         return created?.UUID == instance.Id
             ? ServiceResult<GameSettingObj>.SuccessResult(created)
@@ -298,7 +365,9 @@ public sealed partial class GameInstanceService(IServiceScopeFactory scopeFactor
         try
         {
             if (!await profiles.SaveRefreshedLogin(profile, args.Auth, CancellationToken.None))
+            {
                 logger.LogWarning("Could not save refreshed login for profile {ProfileId}", profile.Id);
+            }
         }
         catch (DbException e)
         {
@@ -362,20 +431,20 @@ public sealed partial class GameInstanceService(IServiceScopeFactory scopeFactor
     public Task StartAsync(CancellationToken cancellationToken)
     {
         //核心初始化
-        ColorMCCore.Init(new()
+        ColorMCCore.Init(new CoreInitObj
         {
             Local = LauncherPaths.ColorMcDirectory,
             UseAuthDatabase = false,
             CurseForgeKey = "$2a$10$ZEIKK/IxI6VA.RujTLD8vu3YwTVM/Syq6tvaImx1X4U773QzWDGMO"
         });
-        
+
         settings.AttachFramework();
         DownloadManager.AcquireDownloadSlot = traffic.AcquireAsync;
         DownloadManager.ThrottleDownload = traffic.ThrottleAsync;
         ConfigLoad.Save(); // 保存到 Core 数据目录下的 config.json
-        
+
         ColorMCCore.Init1();
-        
+
         return Task.CompletedTask;
     }
 

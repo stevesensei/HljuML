@@ -18,14 +18,14 @@ namespace HljuML.App.Core;
 
 public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 {
-    private readonly LauncherSettingsService _settings;
-    private readonly ILogger<SettingsViewModel> _logger;
-    private bool _disposed;
-    private LauncherBackground? _backgroundMode;
-    private int _imageRequest;
-    private string _section = "Game";
-    private string _memory, _threads, _limit, _jvm, _mua;
     private readonly Dictionary<string, string?> _errors = new();
+    private readonly ILogger<SettingsViewModel> _logger;
+    private readonly LauncherSettingsService _settings;
+    private LauncherBackground? _backgroundMode;
+    private bool _disposed;
+    private int _imageRequest;
+    private string _memory, _threads, _limit, _jvm, _mua;
+    private string _section = "Game";
 
     public SettingsViewModel(LauncherSettingsService settings, JavaSettingsViewModel java,
         ILogger<SettingsViewModel> logger)
@@ -44,7 +44,6 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         UpdateBackground();
     }
 
-    public event PropertyChangedEventHandler? PropertyChanged;
     public JavaSettingsViewModel Java { get; }
     public string HljuMLVersion => LauncherInfo.Version;
     public string ColorMCVersion => LauncherInfo.CoreFrameworkVersion;
@@ -56,51 +55,167 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     public bool IsGame => _section == "Game";
     public bool IsLauncher => _section == "Launcher";
     public bool IsAbout => _section == "About";
-    public void SelectSection(string section)
-    {
-        _section = section;
-        Notify(nameof(IsGame)); Notify(nameof(IsLauncher)); Notify(nameof(IsAbout));
-    }
 
     public IReadOnlyList<SelectOption> StartOptions { get; } =
-    [new(LauncherStartBehavior.KeepOpen, "保持不变"), new(LauncherStartBehavior.Minimize, "最小化启动器"), new(LauncherStartBehavior.Close, "自动关闭启动器")];
+    [
+        new(LauncherStartBehavior.KeepOpen, "保持不变"), new(LauncherStartBehavior.Minimize, "最小化启动器"),
+        new(LauncherStartBehavior.Close, "自动关闭启动器")
+    ];
+
     public IReadOnlyList<SelectOption> WindowOptions { get; } =
-    [new(GameWindowMode.Default, "默认"), new(GameWindowMode.Fullscreen, "全屏"),
-        new(GameWindowMode.Maximized, OperatingSystem.IsWindows() ? "最大化" : "最大化（当前平台不可用）") { IsDisabled = !OperatingSystem.IsWindows() }];
+    [
+        new(GameWindowMode.Default, "默认"), new(GameWindowMode.Fullscreen, "全屏"),
+        new(GameWindowMode.Maximized, OperatingSystem.IsWindows() ? "最大化" : "最大化（当前平台不可用）")
+            { IsDisabled = !OperatingSystem.IsWindows() }
+    ];
+
     public IReadOnlyList<SelectOption> SourceOptions { get; } =
-    [new(SourceLocal.Offical, "官方"), new(SourceLocal.BMCLAPI, "BMCL API 镜像源")];
+        [new(SourceLocal.Offical, "官方"), new(SourceLocal.BMCLAPI, "BMCL API 镜像源")];
+
     public IReadOnlyList<SelectOption> CommunityOptions { get; } =
-    [new(CommunityDownloadSource.Official, "官方"), new(CommunityDownloadSource.Mcim, "MCIM 镜像源（占位）") { IsDisabled = true }];
+    [
+        new(CommunityDownloadSource.Official, "官方"),
+        new(CommunityDownloadSource.Mcim, "MCIM 镜像源（占位）") { IsDisabled = true }
+    ];
+
     public IReadOnlyList<SelectOption> BackgroundOptions { get; } =
-    [new(LauncherBackground.Default, "默认"), new(LauncherBackground.RandomImage, "随机图片")];
+        [new(LauncherBackground.Default, "默认"), new(LauncherBackground.RandomImage, "随机图片")];
+
     public IReadOnlyList<SelectOption> ColorOptions { get; } =
-    [new("sky", "天蓝"), new("leaf", "绿叶（占位）") { IsDisabled = true }];
+        [new("sky", "天蓝"), new("leaf", "绿叶（占位）") { IsDisabled = true }];
+
     public SelectOption SelectedColor => ColorOptions[0];
+
     public IReadOnlyList<SelectOption> LogLevelOptions { get; } = Enum.GetValues<LogLevel>()
         .Where(level => level != LogLevel.None).Select(level => new SelectOption(level, level.ToString())).ToArray();
-    private static SelectOption? Find(IEnumerable<SelectOption> options, object value) => options.FirstOrDefault(option => Equals(option.Value, value));
-    public SelectOption? SelectedStart { get => Find(StartOptions, _settings.Value.AfterGameStart); set => Choice(value, (s, v) => s with { AfterGameStart = (LauncherStartBehavior)v }); }
-    public SelectOption? SelectedWindow { get => Find(WindowOptions, _settings.Value.GameWindow); set => Choice(value, (s, v) => s with { GameWindow = (GameWindowMode)v }); }
-    public SelectOption? SelectedSource { get => Find(SourceOptions, _settings.Value.MinecraftSource); set => Choice(value, (s, v) => s with { MinecraftSource = (SourceLocal)v }); }
-    public SelectOption? SelectedCommunity { get => Find(CommunityOptions, _settings.Value.CommunitySource); set => Choice(value, (s, v) => s with { CommunitySource = (CommunityDownloadSource)v }); }
-    public SelectOption? SelectedBackground { get => Find(BackgroundOptions, _settings.Value.Background); set => Choice(value, (s, v) => s with { Background = (LauncherBackground)v }); }
-    public SelectOption? SelectedLogLevel { get => Find(LogLevelOptions, _settings.Value.MinimumLogLevel); set => Choice(value, (s, v) => s with { MinimumLogLevel = (LogLevel)v }); }
-    public bool DebugMode { get => _settings.Value.DebugMode; set => Save(s => s with { DebugMode = value }); }
-    private void Choice(SelectOption? option, Func<LauncherSettings, object, LauncherSettings> change)
+
+    public SelectOption? SelectedStart
     {
-        if (option is not null && !option.IsDisabled) Save(s => change(s, option.Value!));
+        get => Find(StartOptions, _settings.Value.AfterGameStart);
+        set => Choice(value, (s, v) => s with { AfterGameStart = (LauncherStartBehavior)v });
     }
 
-    public string Memory { get => _memory; set { _memory = value; Notify(nameof(Memory)); } }
-    public string Threads { get => _threads; set { _threads = value; Notify(nameof(Threads)); } }
-    public string Limit { get => _limit; set { _limit = value; Notify(nameof(Limit)); } }
-    public string Jvm { get => _jvm; set { _jvm = value; Notify(nameof(Jvm)); } }
-    public string Mua { get => _mua; set { _mua = value; Notify(nameof(Mua)); } }
+    public SelectOption? SelectedWindow
+    {
+        get => Find(WindowOptions, _settings.Value.GameWindow);
+        set => Choice(value, (s, v) => s with { GameWindow = (GameWindowMode)v });
+    }
+
+    public SelectOption? SelectedSource
+    {
+        get => Find(SourceOptions, _settings.Value.MinecraftSource);
+        set => Choice(value, (s, v) => s with { MinecraftSource = (SourceLocal)v });
+    }
+
+    public SelectOption? SelectedCommunity
+    {
+        get => Find(CommunityOptions, _settings.Value.CommunitySource);
+        set => Choice(value, (s, v) => s with { CommunitySource = (CommunityDownloadSource)v });
+    }
+
+    public SelectOption? SelectedBackground
+    {
+        get => Find(BackgroundOptions, _settings.Value.Background);
+        set => Choice(value, (s, v) => s with { Background = (LauncherBackground)v });
+    }
+
+    public SelectOption? SelectedLogLevel
+    {
+        get => Find(LogLevelOptions, _settings.Value.MinimumLogLevel);
+        set => Choice(value, (s, v) => s with { MinimumLogLevel = (LogLevel)v });
+    }
+
+    public bool DebugMode
+    {
+        get => _settings.Value.DebugMode;
+        set => Save(s => s with { DebugMode = value });
+    }
+
+    public string Memory
+    {
+        get => _memory;
+        set
+        {
+            _memory = value;
+            Notify(nameof(Memory));
+        }
+    }
+
+    public string Threads
+    {
+        get => _threads;
+        set
+        {
+            _threads = value;
+            Notify(nameof(Threads));
+        }
+    }
+
+    public string Limit
+    {
+        get => _limit;
+        set
+        {
+            _limit = value;
+            Notify(nameof(Limit));
+        }
+    }
+
+    public string Jvm
+    {
+        get => _jvm;
+        set
+        {
+            _jvm = value;
+            Notify(nameof(Jvm));
+        }
+    }
+
+    public string Mua
+    {
+        get => _mua;
+        set
+        {
+            _mua = value;
+            Notify(nameof(Mua));
+        }
+    }
+
     public string? MemoryError => _errors.GetValueOrDefault("Memory");
     public string? ThreadsError => _errors.GetValueOrDefault("Threads");
     public string? LimitError => _errors.GetValueOrDefault("Limit");
     public string? JvmError => _errors.GetValueOrDefault("Jvm");
     public string? MuaError => _errors.GetValueOrDefault("Mua");
+
+    public void Dispose()
+    {
+        _disposed = true;
+        _settings.Changed -= OnSettingsChanged;
+        BackgroundImage?.Dispose();
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    public void SelectSection(string section)
+    {
+        _section = section;
+        Notify(nameof(IsGame));
+        Notify(nameof(IsLauncher));
+        Notify(nameof(IsAbout));
+    }
+
+    private static SelectOption? Find(IEnumerable<SelectOption> options, object value)
+    {
+        return options.FirstOrDefault(option => Equals(option.Value, value));
+    }
+
+    private void Choice(SelectOption? option, Func<LauncherSettings, object, LauncherSettings> change)
+    {
+        if (option is not null && !option.IsDisabled)
+        {
+            Save(s => change(s, option.Value!));
+        }
+    }
 
     /// <summary>文本完成编辑后提交，避免输入小数或多行参数时反复写入半成品。</summary>
     public void Commit(string field)
@@ -108,43 +223,82 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         Save(s => field switch
         {
             "Memory" => s with { MaximumMemoryGb = ParseDecimal(Memory, "最大内存请输入数字，单位 G。") },
-            "Threads" => s with { DownloadThreads = int.TryParse(Threads, out var count) ? count : throw new ArgumentException("下载线程数请输入 1–128 的整数。") },
+            "Threads" => s with
+            {
+                DownloadThreads = int.TryParse(Threads, out var count)
+                    ? count
+                    : throw new ArgumentException("下载线程数请输入 1–128 的整数。")
+            },
             "Limit" => s with { DownloadLimitMb = ParseDecimal(Limit, "限速请输入数字，单位 M/s，0 表示不限速。") },
             "Jvm" => s with { JvmArguments = Jvm.Replace("\r\n", "\n").Trim() },
             "Mua" => s with { MuaOrganizationId = Mua.Trim() },
             _ => s
         }, field);
     }
-    private static decimal ParseDecimal(string text, string error) =>
-        decimal.TryParse(text, NumberStyles.AllowDecimalPoint | NumberStyles.AllowLeadingSign, CultureInfo.CurrentCulture, out var value)
-            ? value : throw new ArgumentException(error);
+
+    private static decimal ParseDecimal(string text, string error)
+    {
+        return decimal.TryParse(text, NumberStyles.AllowDecimalPoint | NumberStyles.AllowLeadingSign,
+            CultureInfo.CurrentCulture, out var value)
+            ? value
+            : throw new ArgumentException(error);
+    }
+
     private void Save(Func<LauncherSettings, LauncherSettings> change, string? field = null)
     {
         try
         {
             _settings.Update(change);
             ErrorMessage = null;
-            if (field is not null) _errors[field] = null;
+            if (field is not null)
+            {
+                _errors[field] = null;
+            }
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException)
         {
             ErrorMessage = error is ArgumentException ? error.Message : "无法保存设置，请检查启动器目录权限后重试。";
-            if (field is not null) _errors[field] = ErrorMessage;
+            if (field is not null)
+            {
+                _errors[field] = ErrorMessage;
+            }
+
             _logger.LogWarning(error, "保存启动器设置失败");
         }
-        if (field is not null) Notify(field + "Error");
-        foreach (var name in new[] { nameof(ErrorMessage), nameof(HasError), nameof(DebugMode), nameof(SelectedStart),
-            nameof(SelectedWindow), nameof(SelectedSource), nameof(SelectedCommunity), nameof(SelectedBackground), nameof(SelectedLogLevel) }) Notify(name);
+
+        if (field is not null)
+        {
+            Notify(field + "Error");
+        }
+
+        foreach (var name in new[]
+                 {
+                     nameof(ErrorMessage), nameof(HasError), nameof(DebugMode), nameof(SelectedStart),
+                     nameof(SelectedWindow), nameof(SelectedSource), nameof(SelectedCommunity),
+                     nameof(SelectedBackground), nameof(SelectedLogLevel)
+                 }) Notify(name);
     }
 
-    private void OnSettingsChanged() => Dispatcher.UIThread.Post(() =>
+    private void OnSettingsChanged()
     {
-        if (!_disposed) { UpdateBackground(); Notify(nameof(DebugMode)); }
-    });
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (!_disposed)
+            {
+                UpdateBackground();
+                Notify(nameof(DebugMode));
+            }
+        });
+    }
+
     private async void UpdateBackground()
     {
         var mode = _settings.Value.Background;
-        if (_backgroundMode == mode) return;
+        if (_backgroundMode == mode)
+        {
+            return;
+        }
+
         _backgroundMode = mode;
         var request = ++_imageRequest;
         Bitmap? image = null;
@@ -157,37 +311,60 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
                     Directory.CreateDirectory(ImagesDirectory);
                     foreach (var path in Directory.EnumerateFiles(ImagesDirectory).OrderBy(_ => Random.Shared.Next()))
                     {
-                        if (!new[] { ".png", ".jpg", ".jpeg", ".webp", ".bmp" }.Contains(Path.GetExtension(path).ToLowerInvariant())) continue;
+                        if (!new[] { ".png", ".jpg", ".jpeg", ".webp", ".bmp" }.Contains(Path.GetExtension(path)
+                                .ToLowerInvariant()))
+                        {
+                            continue;
+                        }
+
                         try
                         {
-                            if (new FileInfo(path).Length > 32 * 1024 * 1024) continue;
+                            if (new FileInfo(path).Length > 32 * 1024 * 1024)
+                            {
+                                continue;
+                            }
+
                             using var stream = File.OpenRead(path);
                             return Bitmap.DecodeToWidth(stream, 2560);
                         }
-                        catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException
-                            or NotSupportedException or InvalidOperationException)
-                        { _logger.LogWarning(error, "无法读取背景图片 {Path}", path); }
+                        catch (Exception error) when (error is IOException or UnauthorizedAccessException
+                                                          or ArgumentException
+                                                          or NotSupportedException or InvalidOperationException)
+                        {
+                            _logger.LogWarning(error, "无法读取背景图片 {Path}", path);
+                        }
                     }
                 }
                 catch (Exception error) when (error is IOException or UnauthorizedAccessException)
-                { _logger.LogWarning(error, "无法读取自定义背景目录"); }
+                {
+                    _logger.LogWarning(error, "无法读取自定义背景目录");
+                }
+
                 return null;
             });
         }
-        if (_disposed || request != _imageRequest) { image?.Dispose(); return; }
+
+        if (_disposed || request != _imageRequest)
+        {
+            image?.Dispose();
+            return;
+        }
+
         var previous = BackgroundImage;
         BackgroundImage = image;
         BackgroundStatus = mode == LauncherBackground.Default ? "使用默认天蓝背景。"
             : image is null ? "目录中没有可读取的图片，已使用默认背景。支持 PNG、JPEG、WebP、BMP（单张不超过 32 MB）。"
             : "已随机选择一张图片；下次启动或重新切换时更换。";
-        Notify(nameof(BackgroundImage)); Notify(nameof(BackgroundStatus));
-        if (previous is not null) Dispatcher.UIThread.Post(previous.Dispose, DispatcherPriority.Background);
+        Notify(nameof(BackgroundImage));
+        Notify(nameof(BackgroundStatus));
+        if (previous is not null)
+        {
+            Dispatcher.UIThread.Post(previous.Dispose, DispatcherPriority.Background);
+        }
     }
-    private void Notify(string property) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(property));
-    public void Dispose()
+
+    private void Notify(string property)
     {
-        _disposed = true;
-        _settings.Changed -= OnSettingsChanged;
-        BackgroundImage?.Dispose();
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(property));
     }
 }

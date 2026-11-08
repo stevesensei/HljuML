@@ -12,7 +12,12 @@ public sealed class DownloadTrafficService : IDisposable
     private readonly SemaphoreSlim _bandwidth = new(1, 1);
     private int _active;
     private double _nextTransfer;
-    private static TaskCompletionSource NewSignal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    private static TaskCompletionSource NewSignal()
+    {
+        return new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
     public int Concurrency => _settings.Value.DownloadThreads;
 
     public DownloadTrafficService(LauncherSettingsService settings)
@@ -34,15 +39,21 @@ public sealed class DownloadTrafficService : IDisposable
                     _active++;
                     return new Lease(this);
                 }
+
                 wait = _changed.Task;
             }
+
             await wait.WaitAsync(token).ConfigureAwait(false);
         }
     }
 
     public async ValueTask ThrottleAsync(int bytes, CancellationToken token)
     {
-        if (_settings.Value.DownloadLimitMb == 0) return;
+        if (_settings.Value.DownloadLimitMb == 0)
+        {
+            return;
+        }
+
         await _bandwidth.WaitAsync(token).ConfigureAwait(false);
         try
         {
@@ -51,10 +62,18 @@ public sealed class DownloadTrafficService : IDisposable
             {
                 token.ThrowIfCancellationRequested();
                 var rate = (double)_settings.Value.DownloadLimitMb * 1_000_000;
-                if (rate == 0) { _nextTransfer = 0; return; }
+                if (rate == 0)
+                {
+                    _nextTransfer = 0;
+                    return;
+                }
+
                 var now = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 if (_nextTransfer > now)
-                    await Task.Delay(TimeSpan.FromSeconds(Math.Min(_nextTransfer - now, 0.1)), token).ConfigureAwait(false);
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(Math.Min(_nextTransfer - now, 0.1)), token)
+                        .ConfigureAwait(false);
+                }
                 else
                 {
                     // 小时间片使更改限速、取消下载均能及时生效，最多允许一个时间片的突发流量。
@@ -64,27 +83,48 @@ public sealed class DownloadTrafficService : IDisposable
                 }
             }
         }
-        finally { _bandwidth.Release(); }
+        finally
+        {
+            _bandwidth.Release();
+        }
     }
 
     private void OnChanged()
     {
-        lock (_sync) Pulse();
+        lock (_sync)
+        {
+            Pulse();
+        }
     }
+
     private void Release()
     {
-        lock (_sync) { _active--; Pulse(); }
+        lock (_sync)
+        {
+            _active--;
+            Pulse();
+        }
     }
+
     private void Pulse()
     {
         var previous = _changed;
         _changed = NewSignal();
         previous.TrySetResult();
     }
-    public void Dispose() => _settings.Changed -= OnChanged;
+
+    public void Dispose()
+    {
+        _settings.Changed -= OnChanged;
+    }
+
     private sealed class Lease(DownloadTrafficService owner) : IDisposable
     {
         private DownloadTrafficService? _owner = owner;
-        public void Dispose() => Interlocked.Exchange(ref _owner, null)?.Release();
+
+        public void Dispose()
+        {
+            Interlocked.Exchange(ref _owner, null)?.Release();
+        }
     }
 }

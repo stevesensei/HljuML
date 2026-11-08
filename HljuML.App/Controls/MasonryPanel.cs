@@ -5,7 +5,7 @@ using Avalonia.Controls;
 namespace HljuML.App.Controls;
 
 /// <summary>
-/// Places each visible child in the shortest available group of adjacent columns.
+///     Places each visible child in the shortest available group of adjacent columns.
 /// </summary>
 public sealed class MasonryPanel : Panel
 {
@@ -49,19 +49,25 @@ public sealed class MasonryPanel : Panel
         set => SetValue(SpacingProperty, value);
     }
 
-    public static int GetColumnSpan(Control control) => control.GetValue(ColumnSpanProperty);
+    public static int GetColumnSpan(Control control)
+    {
+        return control.GetValue(ColumnSpanProperty);
+    }
 
-    public static void SetColumnSpan(Control control, int span) => control.SetValue(ColumnSpanProperty, span);
+    public static void SetColumnSpan(Control control, int span)
+    {
+        control.SetValue(ColumnSpanProperty, span);
+    }
 
     protected override Size MeasureOverride(Size availableSize)
     {
         var width = double.IsFinite(availableSize.Width) ? availableSize.Width : MinimumColumnWidth;
-        return new Size(width, LayoutChildren(width, arrange: false));
+        return new Size(width, LayoutChildren(width, false));
     }
 
     protected override Size ArrangeOverride(Size finalSize)
     {
-        LayoutChildren(finalSize.Width, arrange: true);
+        LayoutChildren(finalSize.Width, true);
         return finalSize;
     }
 

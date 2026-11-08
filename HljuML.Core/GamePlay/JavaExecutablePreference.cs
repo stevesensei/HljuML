@@ -8,7 +8,10 @@ internal static class JavaExecutablePreference
     {
         if (!OperatingSystem.IsWindows() || !Path.IsPathFullyQualified(path)
             || !Path.GetFileName(path).Equals("java.exe", StringComparison.OrdinalIgnoreCase))
+        {
             return path;
+        }
+
         var windowed = Path.Combine(Path.GetDirectoryName(path)!, "javaw.exe");
         return File.Exists(windowed) ? windowed : path;
     }

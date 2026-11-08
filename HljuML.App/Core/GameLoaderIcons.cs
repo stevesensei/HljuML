@@ -17,7 +17,10 @@ internal static class GameLoaderIcons
         [Loaders.OptiFine] = Load("optifine")
     };
 
-    internal static Bitmap Get(Loaders loader) => Images[loader];
+    internal static Bitmap Get(Loaders loader)
+    {
+        return Images[loader];
+    }
 
     private static Bitmap Load(string name)
     {

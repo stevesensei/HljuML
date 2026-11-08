@@ -12,13 +12,18 @@ public static class LauncherPaths
 
     public static string LogDirectory => Path.Combine(Path.GetDirectoryName(DatabasePath)!, "logs");
 
-    public static bool IsDefaultInstanceDirectory(string path) => GameFolderPathsEqual(path, DefaultInstanceDirectory);
+    public static bool IsDefaultInstanceDirectory(string path)
+    {
+        return GameFolderPathsEqual(path, DefaultInstanceDirectory);
+    }
 
-    internal static bool GameFolderPathsEqual(string first, string second) =>
-        Path.IsPathFullyQualified(first) && Path.IsPathFullyQualified(second)
-        && string.Equals(Path.TrimEndingDirectorySeparator(Path.GetFullPath(first)),
-            Path.TrimEndingDirectorySeparator(Path.GetFullPath(second)),
-            OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+    internal static bool GameFolderPathsEqual(string first, string second)
+    {
+        return Path.IsPathFullyQualified(first) && Path.IsPathFullyQualified(second)
+            && string.Equals(Path.TrimEndingDirectorySeparator(Path.GetFullPath(first)),
+                Path.TrimEndingDirectorySeparator(Path.GetFullPath(second)),
+                OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+    }
 
     public static string DatabasePath
     {
@@ -27,7 +32,9 @@ public static class LauncherPaths
             var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData,
                 Environment.SpecialFolderOption.DoNotVerify);
             if (!Path.IsPathFullyQualified(appData))
+            {
                 throw new InvalidOperationException("Cannot resolve the local application data directory.");
+            }
 
             return Path.Combine(appData, "HljuML", "launcher.db");
         }

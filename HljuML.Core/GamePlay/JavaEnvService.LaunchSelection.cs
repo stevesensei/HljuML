@@ -19,19 +19,26 @@ public sealed partial class JavaEnvService
         if (game.CustomLoader?.CustomJson == true && game.CustomJson is { Count: > 0 })
         {
             var requirements = game.CustomJson.Select(item => item.JavaVersion?.MajorVersion
-                ?? item.CompatibleJavaMajors?.Where(major => major > 0).DefaultIfEmpty(0).Min() ?? 0)
+                    ?? item.CompatibleJavaMajors?.Where(major => major > 0).DefaultIfEmpty(0).Min() ?? 0)
                 .Where(major => major > 0).ToArray();
-            if (requirements.Length > 0) return requirements.Max();
+            if (requirements.Length > 0)
+            {
+                return requirements.Max();
+            }
         }
 
         var id = game.Version;
         if (string.IsNullOrWhiteSpace(id) || id.IndexOfAny(['/', '\\']) >= 0
             || id.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || id is "." or "..")
+        {
             throw new InvalidDataException("实例的 Minecraft 版本标识无效，请检查实例配置。");
+        }
+
         var metadata = VersionPath.GetVersion(id)
             ?? await CheckHelpers.CheckGameArgFileAsync(id).WaitAsync(token);
         token.ThrowIfCancellationRequested();
-        return metadata?.JavaVersion?.MajorVersion is > 0 and var majorVersion ? majorVersion
+        return metadata?.JavaVersion?.MajorVersion is > 0 and var majorVersion
+            ? majorVersion
             : throw new InvalidDataException("无法读取实例要求的 Java 版本，请检查 Minecraft 版本文件后重试。");
     }
 
@@ -41,13 +48,28 @@ public sealed partial class JavaEnvService
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(minimum);
         token.ThrowIfCancellationRequested();
-        if (IsScanning || Environments.Count == 0) await ScanAsync(token);
+        if (IsScanning || Environments.Count == 0)
+        {
+            await ScanAsync(token);
+        }
+
         var comparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
         var preferred = new List<string>();
-        if (!string.IsNullOrWhiteSpace(game.JvmLocal)) preferred.Add(game.JvmLocal);
+        if (!string.IsNullOrWhiteSpace(game.JvmLocal))
+        {
+            preferred.Add(game.JvmLocal);
+        }
+
         if (!string.IsNullOrWhiteSpace(game.JvmName) && JvmPath.GetInfo(game.JvmName) is { } named)
+        {
             preferred.Add(named.GetPath());
-        if (DefaultJavaPath is { Length: > 0 } defaultPath) preferred.Add(defaultPath);
+        }
+
+        if (DefaultJavaPath is { Length: > 0 } defaultPath)
+        {
+            preferred.Add(defaultPath);
+        }
+
         var paths = preferred.Where(Path.IsPathFullyQualified).Select(JavaExecutablePreference.PreferWindowed)
             .Distinct(comparer).ToArray();
         var candidates = Environments.Where(item => Path.IsPathFullyQualified(item.Path))
@@ -65,17 +87,28 @@ public sealed partial class JavaEnvService
                 candidates[path] = java with { Path = path };
                 verified.Add(path);
             }
-            else candidates.Remove(path);
+            else
+            {
+                candidates.Remove(path);
+            }
+
             UpdateLaunchEnvironment(path, java, comparer);
         }
 
         while (SelectClosestForLaunch(candidates.Values, minimum, paths) is { } candidate)
         {
             token.ThrowIfCancellationRequested();
-            if (verified.Contains(candidate.Path)) return new(candidate, minimum);
+            if (verified.Contains(candidate.Path))
+            {
+                return new JavaLaunchSelection(candidate, minimum);
+            }
+
             var actual = await Task.Run(() => JavaHelper.GetJavaInfo(candidate.Path), token);
             UpdateLaunchEnvironment(candidate.Path, actual, comparer);
-            if (actual is null) candidates.Remove(candidate.Path);
+            if (actual is null)
+            {
+                candidates.Remove(candidate.Path);
+            }
             else
             {
                 candidates[candidate.Path] = actual with { Path = candidate.Path };
@@ -83,6 +116,7 @@ public sealed partial class JavaEnvService
             }
             // 可执行文件可能已被替换；更新实际版本后重新排序，不能使用过期扫描结果。
         }
+
         return null;
     }
 
@@ -90,12 +124,18 @@ public sealed partial class JavaEnvService
         IReadOnlyList<string> preferredPaths)
     {
         var comparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+
         int Preference(JavaInfoObj java)
         {
             for (var index = 0; index < preferredPaths.Count; index++)
-                if (comparer.Equals(java.Path, preferredPaths[index])) return index;
+                if (comparer.Equals(java.Path, preferredPaths[index]))
+                {
+                    return index;
+                }
+
             return int.MaxValue;
         }
+
         return candidates.Where(java => java.MajorVersion >= minimum)
             .OrderBy(java => java.MajorVersion).ThenBy(Preference)
             .ThenByDescending(java => java.Arch == SystemInfo.SystemArch)
@@ -111,6 +151,7 @@ public sealed partial class JavaEnvService
             _environments = (actual is null ? remaining : remaining.Prepend(actual with { Path = path }))
                 .OrderByDescending(item => item.MajorVersion).ThenBy(item => item.Version).ToArray();
         }
+
         Changed?.Invoke();
     }
 }

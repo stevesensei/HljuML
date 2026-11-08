@@ -5,8 +5,6 @@ namespace HljuML.App.Core;
 
 public sealed class DownloadHubViewModel : INotifyPropertyChanged, IDisposable
 {
-    private DownloadSection _selectedSection = DownloadSection.Vanilla;
-
     public DownloadHubViewModel(GameDownloadViewModel gameDownloads, CommunityResourceViewModel community)
     {
         GameDownloads = gameDownloads;
@@ -14,22 +12,34 @@ public sealed class DownloadHubViewModel : INotifyPropertyChanged, IDisposable
         Community.VanillaCreationRequested += OnVanillaCreationRequested;
     }
 
-    public event PropertyChangedEventHandler? PropertyChanged;
     public GameDownloadViewModel GameDownloads { get; }
     public CommunityResourceViewModel Community { get; }
-    public DownloadSection SelectedSection => _selectedSection;
-    public bool IsVanilla => _selectedSection == DownloadSection.Vanilla;
+    public DownloadSection SelectedSection { get; private set; } = DownloadSection.Vanilla;
+
+    public bool IsVanilla => SelectedSection == DownloadSection.Vanilla;
     public bool IsCommunity => !IsVanilla;
-    public bool IsMods => _selectedSection == DownloadSection.Mods;
-    public bool IsModpacks => _selectedSection == DownloadSection.Modpacks;
-    public bool IsDataPacks => _selectedSection == DownloadSection.DataPacks;
-    public bool IsResourcePacks => _selectedSection == DownloadSection.ResourcePacks;
-    public bool IsShaders => _selectedSection == DownloadSection.Shaders;
+    public bool IsMods => SelectedSection == DownloadSection.Mods;
+    public bool IsModpacks => SelectedSection == DownloadSection.Modpacks;
+    public bool IsDataPacks => SelectedSection == DownloadSection.DataPacks;
+    public bool IsResourcePacks => SelectedSection == DownloadSection.ResourcePacks;
+    public bool IsShaders => SelectedSection == DownloadSection.Shaders;
+
+    public void Dispose()
+    {
+        Community.VanillaCreationRequested -= OnVanillaCreationRequested;
+        Community.Dispose();
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
 
     public void Select(DownloadSection section)
     {
-        if (_selectedSection == section) return;
-        _selectedSection = section;
+        if (SelectedSection == section)
+        {
+            return;
+        }
+
+        SelectedSection = section;
         if (section != DownloadSection.Vanilla)
         {
             Community.ResourceType = section switch
@@ -43,8 +53,11 @@ public sealed class DownloadHubViewModel : INotifyPropertyChanged, IDisposable
             };
         }
 
-        foreach (var name in new[] { nameof(SelectedSection), nameof(IsVanilla), nameof(IsCommunity),
-            nameof(IsMods), nameof(IsModpacks), nameof(IsDataPacks), nameof(IsResourcePacks), nameof(IsShaders) })
+        foreach (var name in new[]
+                 {
+                     nameof(SelectedSection), nameof(IsVanilla), nameof(IsCommunity),
+                     nameof(IsMods), nameof(IsModpacks), nameof(IsDataPacks), nameof(IsResourcePacks), nameof(IsShaders)
+                 })
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }
 
@@ -52,11 +65,5 @@ public sealed class DownloadHubViewModel : INotifyPropertyChanged, IDisposable
     {
         GameDownloads.BackToCatalog();
         Select(DownloadSection.Vanilla);
-    }
-
-    public void Dispose()
-    {
-        Community.VanillaCreationRequested -= OnVanillaCreationRequested;
-        Community.Dispose();
     }
 }

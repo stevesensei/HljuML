@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Threading;
 using HljuML.Core.GamePlay;
+using HljuML.Core.Infrastructure.Storage;
 
 namespace HljuML.App.Core;
 
@@ -14,19 +15,20 @@ public sealed partial class CommunityResourceViewModel : INotifyPropertyChanged,
 {
     private static readonly IReadOnlyList<string> LoaderFilters =
         ["全部加载器", "原版", "Fabric", "Forge", "NeoForge", "Quilt"];
+
     private static readonly IReadOnlyList<string> SortFilters = ["相关度", "最近更新", "最多下载"];
     private readonly GameInstanceService _gameInstances;
     private readonly CancellationToken _stopping;
-    private bool _initialized;
     private bool _disposed;
+    private bool _initialized;
+    private CommunityResourceType _resourceType = CommunityResourceType.Mod;
     private string _searchText = string.Empty;
-    private string _selectedVersion = "全部版本";
-    private string _selectedLoader = LoaderFilters[0];
     private string _selectedCategory = "全部分类";
+    private string _selectedLoader = LoaderFilters[0];
+    private CommunityResourceItem? _selectedResource;
     private string _selectedSort = SortFilters[0];
     private CommunityTargetInstance? _selectedTarget;
-    private CommunityResourceItem? _selectedResource;
-    private CommunityResourceType _resourceType = CommunityResourceType.Mod;
+    private string _selectedVersion = "全部版本";
 
     public CommunityResourceViewModel(GameInstanceService gameInstances, CancellationToken stopping)
     {
@@ -35,15 +37,16 @@ public sealed partial class CommunityResourceViewModel : INotifyPropertyChanged,
         CategoryOptions = CategoriesFor(_resourceType);
     }
 
-    public event PropertyChangedEventHandler? PropertyChanged;
-    public event Action? VanillaCreationRequested;
-
     public CommunityResourceType ResourceType
     {
         get => _resourceType;
         set
         {
-            if (_resourceType == value) return;
+            if (_resourceType == value)
+            {
+                return;
+            }
+
             _resourceType = value;
             CategoryOptions = CategoriesFor(value);
             _selectedCategory = CategoryOptions[0];
@@ -75,13 +78,13 @@ public sealed partial class CommunityResourceViewModel : INotifyPropertyChanged,
     public bool RequiresTargetInstance => ResourceType != CommunityResourceType.Modpack;
     public bool ShowsModpackDestination => ResourceType == CommunityResourceType.Modpack;
     public bool ShowsWorldNotice => ResourceType == CommunityResourceType.DataPack;
-    public string ModpackDestination => HljuML.Core.Infrastructure.Storage.LauncherPaths.DefaultInstanceDirectory;
+    public string ModpackDestination => LauncherPaths.DefaultInstanceDirectory;
     public IReadOnlyList<CommunityTargetInstance> TargetInstances { get; private set; } = [];
     public IReadOnlyList<string> VersionOptions { get; private set; } = ["全部版本"];
     public IReadOnlyList<string> LoaderOptions => LoaderFilters;
     public IReadOnlyList<string> CategoryOptions { get; private set; }
     public IReadOnlyList<string> SortOptions => SortFilters;
-    public IReadOnlyList<CommunityResourceItem> Results { get; private set; } = [];
+    public IReadOnlyList<CommunityResourceItem> Results { get; } = [];
     public bool HasResults => Results.Count > 0;
     public bool IsLoadingTargets { get; private set; }
     public string? TargetLoadError { get; private set; }
@@ -90,27 +93,73 @@ public sealed partial class CommunityResourceViewModel : INotifyPropertyChanged,
     public bool IsBrowsingResults => SelectedResource is null;
     public bool CanInstall => false;
 
-    public string SearchText { get => _searchText; set => Set(ref _searchText, value, nameof(SearchText)); }
-    public string SelectedVersion { get => _selectedVersion; set => Set(ref _selectedVersion, value, nameof(SelectedVersion)); }
-    public string SelectedLoader { get => _selectedLoader; set => Set(ref _selectedLoader, value, nameof(SelectedLoader)); }
-    public string SelectedCategory { get => _selectedCategory; set => Set(ref _selectedCategory, value, nameof(SelectedCategory)); }
-    public string SelectedSort { get => _selectedSort; set => Set(ref _selectedSort, value, nameof(SelectedSort)); }
-    public CommunityTargetInstance? SelectedTarget { get => _selectedTarget; set => Set(ref _selectedTarget, value, nameof(SelectedTarget)); }
+    public string SearchText
+    {
+        get => _searchText;
+        set => Set(ref _searchText, value, nameof(SearchText));
+    }
+
+    public string SelectedVersion
+    {
+        get => _selectedVersion;
+        set => Set(ref _selectedVersion, value, nameof(SelectedVersion));
+    }
+
+    public string SelectedLoader
+    {
+        get => _selectedLoader;
+        set => Set(ref _selectedLoader, value, nameof(SelectedLoader));
+    }
+
+    public string SelectedCategory
+    {
+        get => _selectedCategory;
+        set => Set(ref _selectedCategory, value, nameof(SelectedCategory));
+    }
+
+    public string SelectedSort
+    {
+        get => _selectedSort;
+        set => Set(ref _selectedSort, value, nameof(SelectedSort));
+    }
+
+    public CommunityTargetInstance? SelectedTarget
+    {
+        get => _selectedTarget;
+        set => Set(ref _selectedTarget, value, nameof(SelectedTarget));
+    }
+
     public CommunityResourceItem? SelectedResource
     {
         get => _selectedResource;
         set
         {
-            if (!Set(ref _selectedResource, value, nameof(SelectedResource))) return;
+            if (!Set(ref _selectedResource, value, nameof(SelectedResource)))
+            {
+                return;
+            }
+
             Notify(nameof(HasSelectedResource));
             Notify(nameof(IsBrowsingResults));
             Notify(nameof(CanInstall));
         }
     }
 
+    public void Dispose()
+    {
+        _disposed = true;
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+    public event Action? VanillaCreationRequested;
+
     public Task InitializeAsync()
     {
-        if (_initialized || _disposed) return Task.CompletedTask;
+        if (_initialized || _disposed)
+        {
+            return Task.CompletedTask;
+        }
+
         _initialized = true;
         return LoadTargetsAsync();
     }
@@ -120,19 +169,31 @@ public sealed partial class CommunityResourceViewModel : INotifyPropertyChanged,
         var shouldLoad = false;
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
-            if (_disposed || IsLoadingTargets) return;
+            if (_disposed || IsLoadingTargets)
+            {
+                return;
+            }
+
             IsLoadingTargets = true;
             TargetLoadError = null;
             NotifyTargetState();
             shouldLoad = true;
         });
-        if (!shouldLoad) return;
+        if (!shouldLoad)
+        {
+            return;
+        }
+
         try
         {
             var instances = await _gameInstances.GetGameInstances(_stopping);
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                if (_disposed) return;
+                if (_disposed)
+                {
+                    return;
+                }
+
                 TargetInstances = instances.Select(instance => new CommunityTargetInstance(instance.Id,
                     $"{instance.Name} · {instance.Version}", instance.Version, instance.Loader.ToString())).ToArray();
                 VersionOptions = new[] { "全部版本" }.Concat(instances.Select(instance => instance.Version)
@@ -143,12 +204,17 @@ public sealed partial class CommunityResourceViewModel : INotifyPropertyChanged,
                 Notify(nameof(VersionOptions));
             });
         }
-        catch (OperationCanceledException) when (_stopping.IsCancellationRequested) { }
+        catch (OperationCanceledException) when (_stopping.IsCancellationRequested)
+        {
+        }
         catch (DbException)
         {
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                if (!_disposed) TargetLoadError = "无法读取兼容实例，请稍后重试。";
+                if (!_disposed)
+                {
+                    TargetLoadError = "无法读取兼容实例，请稍后重试。";
+                }
             });
         }
         finally
@@ -156,30 +222,46 @@ public sealed partial class CommunityResourceViewModel : INotifyPropertyChanged,
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 IsLoadingTargets = false;
-                if (!_disposed) NotifyTargetState();
+                if (!_disposed)
+                {
+                    NotifyTargetState();
+                }
             });
         }
     }
 
-    public void RequestVanillaCreation() => VanillaCreationRequested?.Invoke();
-    public void ClearSelection() => SelectedResource = null;
-
-    private static IReadOnlyList<string> CategoriesFor(CommunityResourceType type) => type switch
+    public void RequestVanillaCreation()
     {
-        CommunityResourceType.Mod => ["全部分类", "冒险", "科技", "魔法", "装饰", "性能"],
-        CommunityResourceType.Modpack => ["全部分类", "冒险", "科技", "魔法", "轻量", "多人"],
-        CommunityResourceType.DataPack => ["全部分类", "玩法", "世界生成", "实用", "装饰"],
-        CommunityResourceType.ResourcePack => ["全部分类", "写实", "风格化", "简洁", "界面"],
-        CommunityResourceType.Shader => ["全部分类", "写实", "性能", "风格化"],
-        _ => throw new ArgumentOutOfRangeException(nameof(type))
-    };
+        VanillaCreationRequested?.Invoke();
+    }
+
+    public void ClearSelection()
+    {
+        SelectedResource = null;
+    }
+
+    private static IReadOnlyList<string> CategoriesFor(CommunityResourceType type)
+    {
+        return type switch
+        {
+            CommunityResourceType.Mod => ["全部分类", "冒险", "科技", "魔法", "装饰", "性能"],
+            CommunityResourceType.Modpack => ["全部分类", "冒险", "科技", "魔法", "轻量", "多人"],
+            CommunityResourceType.DataPack => ["全部分类", "玩法", "世界生成", "实用", "装饰"],
+            CommunityResourceType.ResourcePack => ["全部分类", "写实", "风格化", "简洁", "界面"],
+            CommunityResourceType.Shader => ["全部分类", "写实", "性能", "风格化"],
+            _ => throw new ArgumentOutOfRangeException(nameof(type))
+        };
+    }
 
     private void NotifyPage()
     {
-        foreach (var name in new[] { nameof(ResourceType), nameof(Title), nameof(Description),
-            nameof(RequiresTargetInstance), nameof(ShowsModpackDestination), nameof(ShowsWorldNotice),
-            nameof(CategoryOptions), nameof(SelectedCategory), nameof(SelectedResource),
-            nameof(HasSelectedResource), nameof(IsBrowsingResults), nameof(CanInstall) }) Notify(name);
+        foreach (var name in new[]
+                 {
+                     nameof(ResourceType), nameof(Title), nameof(Description),
+                     nameof(RequiresTargetInstance), nameof(ShowsModpackDestination), nameof(ShowsWorldNotice),
+                     nameof(CategoryOptions), nameof(SelectedCategory), nameof(SelectedResource),
+                     nameof(HasSelectedResource), nameof(IsBrowsingResults), nameof(CanInstall)
+                 }) Notify(name);
     }
 
     private void NotifyTargetState()
@@ -191,12 +273,18 @@ public sealed partial class CommunityResourceViewModel : INotifyPropertyChanged,
 
     private bool Set<T>(ref T field, T value, string name)
     {
-        if (EqualityComparer<T>.Default.Equals(field, value)) return false;
+        if (EqualityComparer<T>.Default.Equals(field, value))
+        {
+            return false;
+        }
+
         field = value;
         Notify(name);
         return true;
     }
 
-    private void Notify(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-    public void Dispose() => _disposed = true;
+    private void Notify(string name)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+    }
 }

@@ -14,6 +14,7 @@ public sealed partial class DownloadManagementService
         IProgress<GameLaunchProgress>? progress, CancellationToken cancellationToken)
     {
         DownloadJob? job = null;
+
         DownloadJob GetJob()
         {
             bool created;
@@ -29,10 +30,15 @@ public sealed partial class DownloadManagementService
                     };
                     _jobs.Add(job.Id, job);
                 }
+
                 current = job;
             }
+
             if (created)
+            {
                 NotifyTaskCreated(current.Id);
+            }
+
             return current;
         }
 
@@ -40,21 +46,31 @@ public sealed partial class DownloadManagementService
         {
             var result = await TrackColorMcAsync(GetJob, launch, progress, cancellationToken).ConfigureAwait(false);
             if (job is not null)
+            {
                 CompleteOperation(job.Id, result is null || result is false
-                    ? DownloadStatus.Failed : DownloadStatus.Succeeded,
+                        ? DownloadStatus.Failed
+                        : DownloadStatus.Succeeded,
                     result is null || result is false ? "游戏进程未启动。" : null);
+            }
+
             return result;
         }
         catch (OperationCanceledException)
         {
             if (job is not null)
+            {
                 CompleteOperation(job.Id, DownloadStatus.Canceled, "启动已取消。");
+            }
+
             throw;
         }
         catch (Exception error)
         {
             if (job is not null)
+            {
                 CompleteOperation(job.Id, DownloadStatus.Failed, error.Message);
+            }
+
             throw;
         }
     }
@@ -66,15 +82,22 @@ public sealed partial class DownloadManagementService
         var inContext = new AsyncLocal<bool> { Value = true };
         var batches = new List<ColorMcBatch>();
         var closed = false;
+
         void Attach(DownloadEventArgs args)
         {
             if (!inContext.Value || args.GuiHandle is not null || closed)
+            {
                 return;
+            }
+
             var job = getJob();
             lock (_sync)
             {
                 if (closed || !job.IsActive)
+                {
                     return;
+                }
+
                 var batch = new ColorMcBatch(this, job, progress);
                 batches.Add(batch);
                 job.Batches.Add(batch);
@@ -104,7 +127,9 @@ public sealed partial class DownloadManagementService
         }
     }
 
-    private sealed class ColorMcBatch(DownloadManagementService owner, DownloadJob job,
+    private sealed class ColorMcBatch(
+        DownloadManagementService owner,
+        DownloadJob job,
         IProgress<GameLaunchProgress>? progress) : IDownloadGui
     {
         private readonly Dictionary<FileItemObj, Guid> _itemIds = new(ReferenceEqualityComparer.Instance);
@@ -117,7 +142,9 @@ public sealed partial class DownloadManagementService
             if (!state)
             {
                 lock (owner._sync)
-                    Close(canceled: false);
+                {
+                    Close(false);
+                }
             }
         }
 
@@ -125,18 +152,26 @@ public sealed partial class DownloadManagementService
         {
             // AddItems is an absolute count; ItemDone repeats for cached files and also counts failures.
             if (type != UpdateType.AddItems)
+            {
                 return;
+            }
+
             GameLaunchProgress? update;
             lock (owner._sync)
             {
                 if (_closed || !job.IsActive)
+                {
                     return;
+                }
+
                 _totalFiles = Math.Max(0, data);
                 job.TotalFiles = job.Batches.All(batch => batch._totalFiles.HasValue)
-                    ? job.Batches.Sum(batch => batch._totalFiles!.Value) : null;
+                    ? job.Batches.Sum(batch => batch._totalFiles!.Value)
+                    : null;
                 CloseIfComplete();
-                update = CaptureProgress(force: true);
+                update = CaptureProgress(true);
             }
+
             Report(update);
         }
 
@@ -146,11 +181,19 @@ public sealed partial class DownloadManagementService
             lock (owner._sync)
             {
                 if (_closed || !job.IsActive)
+                {
                     return;
+                }
+
                 if (!_itemIds.TryGetValue(file, out var id))
+                {
                     _itemIds.Add(file, id = Guid.NewGuid());
+                }
                 else if (job.Items[id].Status == DownloadItemStatus.Succeeded)
+                {
                     return;
+                }
+
                 var status = file.State switch
                 {
                     DownloadItemState.GetInfo or DownloadItemState.Download => DownloadItemStatus.Downloading,
@@ -164,8 +207,9 @@ public sealed partial class DownloadManagementService
                     file.AllSize > 0 ? file.AllSize : null);
                 job.Items[id] = item;
                 CloseIfComplete();
-                update = CaptureProgress(force: _closed, item);
+                update = CaptureProgress(_closed, item);
             }
+
             Report(update);
         }
 
@@ -173,46 +217,69 @@ public sealed partial class DownloadManagementService
         {
             if (_totalFiles is { } total && _itemIds.Count == total &&
                 _itemIds.Values.All(id => job.Items[id].Status == DownloadItemStatus.Succeeded))
+            {
                 _closed = true;
+            }
         }
 
         internal void Close(bool canceled)
         {
             if (_closed || !job.IsActive)
+            {
                 return;
+            }
+
             _closed = true;
             var message = canceled ? "下载已取消。" : "ColorMC 未确认该批次的全部文件完成。";
             foreach (var id in _itemIds.Values)
             {
                 var item = job.Items[id];
                 if (item.Status != DownloadItemStatus.Succeeded)
+                {
                     job.Items[id] = item with
                     {
                         Status = canceled ? DownloadItemStatus.Canceled : DownloadItemStatus.Failed,
                         Error = message
                     };
+                }
             }
+
             job.Error ??= message;
         }
 
         private GameLaunchProgress? CaptureProgress(bool force, DownloadItemSnapshot? item = null)
         {
             if (progress is null || (!force && Stopwatch.GetElapsedTime(_lastReport) < TimeSpan.FromMilliseconds(150)))
+            {
                 return null;
+            }
+
             _lastReport = Stopwatch.GetTimestamp();
-            return new(job.Phase ?? "正在下载", job.Items.Values.Count(file => file.Status == DownloadItemStatus.Succeeded),
+            return new GameLaunchProgress(job.Phase ?? "正在下载",
+                job.Items.Values.Count(file => file.Status == DownloadItemStatus.Succeeded),
                 job.TotalFiles, item?.Name, item?.DownloadedBytes ?? 0, item?.TotalBytes);
         }
 
         private void Report(GameLaunchProgress? update)
         {
             if (update is null)
+            {
                 return;
-            try { progress?.Report(update); }
-            catch (Exception error) { owner.LogProgressError(error, job.Id); }
+            }
+
+            try
+            {
+                progress?.Report(update);
+            }
+            catch (Exception error)
+            {
+                owner.LogProgressError(error, job.Id);
+            }
         }
     }
 
-    private void LogProgressError(Exception error, Guid id) =>
+    private void LogProgressError(Exception error, Guid id)
+    {
         logger.LogWarning(error, "Failed to report download progress for {DownloadId}", id);
+    }
 }

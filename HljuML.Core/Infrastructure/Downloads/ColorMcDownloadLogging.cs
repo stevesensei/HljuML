@@ -9,7 +9,10 @@ public sealed partial class DownloadManagementService
     public override async Task StartAsync(CancellationToken cancellationToken)
     {
         ColorMCCore.Error += LogColorMcError;
-        try { await base.StartAsync(cancellationToken); }
+        try
+        {
+            await base.StartAsync(cancellationToken);
+        }
         catch
         {
             ColorMCCore.Error -= LogColorMcError;
@@ -56,7 +59,11 @@ public sealed partial class DownloadManagementService
 
     private static string GetLogSource(string source)
     {
-        if (!Uri.TryCreate(source, UriKind.Absolute, out var uri)) return "无效下载地址";
+        if (!Uri.TryCreate(source, UriKind.Absolute, out var uri))
+        {
+            return "无效下载地址";
+        }
+
         return new UriBuilder(uri) { UserName = "", Password = "", Query = "", Fragment = "" }.Uri.AbsoluteUri;
     }
 }

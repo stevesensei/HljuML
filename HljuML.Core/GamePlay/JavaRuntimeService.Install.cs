@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using ColorMC.Core.Downloader;
 using ColorMC.Core.GuiHandle;
@@ -17,7 +18,11 @@ public sealed partial class JavaRuntimeService
     internal async Task<JavaInfoObj> EnsureAsync(int major, Guid operationId,
         DownloadManagementService downloads, CancellationToken token)
     {
-        if (await FindExactAsync(major, token) is { } existing) return existing;
+        if (await FindExactAsync(major, token) is { } existing)
+        {
+            return existing;
+        }
+
         downloads.SetOperationPhase(operationId, $"正在获取 Java {major} 下载信息");
         var os = OperatingSystem.IsWindows() ? 1
             : OperatingSystem.IsLinux() ? 2
@@ -30,17 +35,22 @@ public sealed partial class JavaRuntimeService
         };
         // ColorMC 查询接口没有取消参数；只等待元数据，不允许取消后的结果继续安装。
         var releases = await AdoptiumApi
-            .GetJavaListAsync(major.ToString(System.Globalization.CultureInfo.InvariantCulture), os)
+            .GetJavaListAsync(major.ToString(CultureInfo.InvariantCulture), os)
             .WaitAsync(TimeSpan.FromSeconds(60), token);
-        var release = releases?.FirstOrDefault(item => item.Binary.Os == AdoptiumApi.GetOs(os) && item.Binary.Architecture == arch && item.Binary.ImageType == "jdk")
-                      ?? throw new IOException($"没有找到适用于当前系统和架构的 Java {major}，请手动安装后重试。");
+        var release = releases?.FirstOrDefault(item =>
+                item.Binary.Os == AdoptiumApi.GetOs(os) && item.Binary.Architecture == arch
+                && item.Binary.ImageType == "jdk")
+            ?? throw new IOException($"没有找到适用于当前系统和架构的 Java {major}，请手动安装后重试。");
         var package = release.Binary.Package;
-        if (package.Checksum is not { Length: 64 } 
+        if (package.Checksum is not { Length: 64 }
             || !package.Checksum.All(Uri.IsHexDigit)
             || !Uri.TryCreate(package.Link, UriKind.Absolute, out var source) ||
             source.Scheme != "https"
             || package.Size <= 0 || package.Size > 2L * 1024 * 1024 * 1024)
+        {
             throw new InvalidDataException("Java 下载源返回了无效的地址、大小或 SHA-256。");
+        }
+
         var extension = package.Name.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase) ? ".tar.gz"
             : package.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) ? ".zip"
             : throw new InvalidDataException("Java 下载源返回了不支持的压缩格式。");
@@ -57,8 +67,11 @@ public sealed partial class JavaRuntimeService
                 if (input.Length != package.Size || !string.Equals(
                         Convert.ToHexString(await SHA256.HashDataAsync(input, token)), package.Checksum,
                         StringComparison.OrdinalIgnoreCase))
+                {
                     throw new InvalidDataException("Java 压缩包大小或 SHA-256 校验失败。");
+                }
             }
+
             token.ThrowIfCancellationRequested();
             downloads.SetOperationPhase(operationId, $"正在解压并检查 Java {major}");
             // 不调用 InstallAsync：当前 ColorMC 实现将 UnzipJavaAsync 的 name/file 参数传反。
@@ -69,7 +82,10 @@ public sealed partial class JavaRuntimeService
             var executable = info is null ? null : JavaExecutablePreference.PreferWindowed(info.GetPath());
             var java = executable is null ? null : await Task.Run(() => JavaHelper.GetJavaInfo(executable), token);
             if (java?.MajorVersion != major || java.Arch != SystemInfo.SystemArch)
+            {
                 throw new IOException($"Java {major} 安装检查失败（{result.Error}），请查看日志或手动安装。");
+            }
+
             installed = true;
             await environments.ScanAsync(token);
             return java;
@@ -83,7 +99,10 @@ public sealed partial class JavaRuntimeService
         finally
         {
             TryDeleteArchive(archive);
-            if (!installed) CleanupJava(name);
+            if (!installed)
+            {
+                CleanupJava(name);
+            }
         }
     }
 
@@ -109,13 +128,23 @@ public sealed partial class JavaRuntimeService
             var root = Path.GetFullPath(JvmPath.JavaDir);
             var path = Path.GetFullPath(Path.Combine(root, name));
             if (Path.GetDirectoryName(path) != Path.TrimEndingDirectorySeparator(root))
+            {
                 throw new IOException("Java 清理路径不在运行环境目录内。");
-            if (!Directory.Exists(path)) return;
+            }
+
+            if (!Directory.Exists(path))
+            {
+                return;
+            }
+
             if ((File.GetAttributes(root) & FileAttributes.ReparsePoint) != 0
                 || (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
+            {
                 throw new IOException("Java 清理目录存在重定向。");
+            }
+
             // JDK 可能包含合法的符号链接；Directory.Delete 删除链接本身，不递归进入其目标。
-            Directory.Delete(path, recursive: true);
+            Directory.Delete(path, true);
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
@@ -135,8 +164,19 @@ public sealed partial class JavaRuntimeService
             downloads.SetOperationPhase(operationId, all > 0 ? $"正在解压 Java · {size}/{all}" : "正在解压 Java");
         }
 
-        public Task<bool> FileRename(string? text) => Task.FromResult(false);
-        public void Unzip() => token.ThrowIfCancellationRequested();
-        public void Done() => token.ThrowIfCancellationRequested();
+        public Task<bool> FileRename(string? text)
+        {
+            return Task.FromResult(false);
+        }
+
+        public void Unzip()
+        {
+            token.ThrowIfCancellationRequested();
+        }
+
+        public void Done()
+        {
+            token.ThrowIfCancellationRequested();
+        }
     }
 }

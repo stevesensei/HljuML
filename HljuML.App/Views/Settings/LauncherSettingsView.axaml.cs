@@ -5,6 +5,13 @@ namespace HljuML.App.Views.Settings;
 
 public partial class LauncherSettingsView : UserControl
 {
-    public LauncherSettingsView() => InitializeComponent();
-    private void OnFieldLostFocus(object? sender, RoutedEventArgs e) => SettingsEditing.Commit(DataContext, sender);
+    public LauncherSettingsView()
+    {
+        InitializeComponent();
+    }
+
+    private void OnFieldLostFocus(object? sender, RoutedEventArgs e)
+    {
+        SettingsEditing.Commit(DataContext, sender);
+    }
 }

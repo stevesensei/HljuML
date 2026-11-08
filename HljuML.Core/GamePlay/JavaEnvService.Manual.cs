@@ -1,6 +1,5 @@
 using System.Text.Json;
 using ColorMC.Core.Helpers;
-using ColorMC.Core.Objs;
 using HljuML.Core.Infrastructure.Storage;
 
 namespace HljuML.Core.GamePlay;
@@ -12,16 +11,21 @@ public sealed partial class JavaEnvService
         cancellationToken.ThrowIfCancellationRequested();
         var name = Path.GetFileName(path);
         var validName = OperatingSystem.IsWindows()
-            ? name.Equals("javaw.exe", StringComparison.OrdinalIgnoreCase) || name.Equals("java.exe", StringComparison.OrdinalIgnoreCase)
+            ? name.Equals("javaw.exe", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("java.exe", StringComparison.OrdinalIgnoreCase)
             : name == "java";
         if (!Path.IsPathFullyQualified(path) || !validName || !File.Exists(path))
+        {
             throw new ArgumentException("请选择存在的 javaw.exe 或 java.exe 文件。");
+        }
 
         path = JavaExecutablePreference.PreferWindowed(Path.GetFullPath(path));
         var java = await Task.Run(() => JavaHelper.GetJavaInfo(path), cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         if (java is null || java.MajorVersion <= 0)
+        {
             throw new ArgumentException("无法读取该文件的 Java 版本，请选择有效的 Java 可执行文件。");
+        }
 
         var comparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
         lock (_sync)
@@ -36,6 +40,7 @@ public sealed partial class JavaEnvService
             _defaultJavaPath = path;
             _scanError = null;
         }
+
         Changed?.Invoke();
     }
 
@@ -46,7 +51,7 @@ public sealed partial class JavaEnvService
         try
         {
             File.WriteAllText(temporary, JsonSerializer.Serialize(new JavaPreferences(defaultPath, manualPaths)));
-            File.Move(temporary, LauncherPaths.JavaSettingsPath, overwrite: true);
+            File.Move(temporary, LauncherPaths.JavaSettingsPath, true);
         }
         finally
         {

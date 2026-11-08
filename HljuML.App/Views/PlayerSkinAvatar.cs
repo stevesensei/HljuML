@@ -30,7 +30,9 @@ internal static class PlayerSkinAvatar
     {
         using var image = CropHead(path);
         if (image is null)
+        {
             return null;
+        }
 
         using var encoded = image.Encode(SKEncodedImageFormat.Png, 100);
         using var stream = encoded.AsStream();
@@ -41,15 +43,21 @@ internal static class PlayerSkinAvatar
     {
         using var codec = SKCodec.Create(path);
         if (codec is null)
+        {
             return null;
+        }
 
         var (width, height) = (codec.Info.Width, codec.Info.Height);
         if (width is < 64 or > 1024 || width % 64 != 0 || (height != width && height != width / 2))
+        {
             return null;
+        }
 
         using var skin = SKBitmap.Decode(codec);
         if (skin is null)
+        {
             return null;
+        }
 
         var scale = width / 64;
         using var texture = SKImage.FromBitmap(skin);

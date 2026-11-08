@@ -3,14 +3,16 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Interactivity;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Threading;
 using HljuML.App.Core;
 using HljuML.App.Views;
-using HljuML.Core.Model.Entity;
+using HljuML.Core.GamePlay;
 using HljuML.Core.Infrastructure.Downloads;
-using HljuML.Shared.Model;
+using HljuML.Core.Infrastructure.Logging;
+using HljuML.Core.Infrastructure.Settings;
+using HljuML.Core.Model.Entity;
 using Microsoft.Extensions.DependencyInjection;
 using TKCode.Arc;
 
@@ -18,16 +20,18 @@ namespace HljuML.App;
 
 public partial class MainWindow : Window
 {
-    private readonly IServiceScopeFactory? _scopes;
     private readonly DownloadManagementService? _downloads;
-    private readonly HashSet<Guid> _openedDownloadTasks = new();
-    private DownloadManagerWindow? _downloadManager;
-    private bool _closed;
-    private bool _openDownloadsWhenOpened;
+
     private readonly DispatcherTimer _downloadsTimer = new(DispatcherPriority.Background)
     {
         Interval = TimeSpan.FromMilliseconds(400)
     };
+
+    private readonly HashSet<Guid> _openedDownloadTasks = new();
+    private readonly IServiceScopeFactory? _scopes;
+    private bool _closed;
+    private DownloadManagerWindow? _downloadManager;
+    private bool _openDownloadsWhenOpened;
 
     public MainWindow()
     {
@@ -40,8 +44,8 @@ public partial class MainWindow : Window
     }
 
     internal MainWindow(IServiceScopeFactory scopes, DownloadManagementService downloads,
-        HljuML.Core.Infrastructure.Settings.LauncherSettingsService settings,
-        HljuML.Core.Infrastructure.Logging.LauncherFileLoggerProvider logs) : this()
+        LauncherSettingsService settings,
+        LauncherFileLoggerProvider logs) : this()
     {
         _scopes = scopes;
         _downloads = downloads;
@@ -62,7 +66,10 @@ public partial class MainWindow : Window
             RefreshDownloads();
             _downloadsTimer.Start();
             if (_openDownloadsWhenOpened)
+            {
                 ShowDownloadManager();
+            }
+
             await viewModel.RefreshLaunchOptionsAsync();
         }
     }
@@ -77,16 +84,27 @@ public partial class MainWindow : Window
             mainModel.GameStarted -= OnGameStarted;
             mainModel.JavaWarningRaised -= OnJavaWarning;
         }
+
         _logsWindow?.Close();
-        if (DataContext is MainViewModel viewModel) viewModel.ModpackImport.IsOpen = false;
+        if (DataContext is MainViewModel viewModel)
+        {
+            viewModel.ModpackImport.IsOpen = false;
+        }
+
         if (_downloads is not null)
+        {
             _downloads.TaskCreated -= OnDownloadTaskCreated;
+        }
+
         _downloadManager?.Close();
         PropertyChanged -= OnWindowPropertyChanged;
         base.OnClosed(e);
     }
 
-    private void OnHomeClicked(object? sender, RoutedEventArgs e) => ShowPage(HomePage, "Home");
+    private void OnHomeClicked(object? sender, RoutedEventArgs e)
+    {
+        ShowPage(HomePage, "Home");
+    }
 
     private void OnDownloadsClicked(object? sender, RoutedEventArgs e)
     {
@@ -102,34 +120,56 @@ public partial class MainWindow : Window
     private void RefreshDownloads()
     {
         if (DataContext is MainViewModel viewModel)
-            viewModel.Downloads.Refresh(includeDetails: false);
+        {
+            viewModel.Downloads.Refresh(false);
+        }
     }
 
-    private void OnDownloadTaskCreated(Guid id) => Dispatcher.UIThread.Post(() =>
+    private void OnDownloadTaskCreated(Guid id)
     {
-        if (_closed || !_openedDownloadTasks.Add(id))
-            return;
-        RefreshDownloads();
-        if (IsVisible)
-            ShowDownloadManager();
-        else
-            _openDownloadsWhenOpened = true;
-    });
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (_closed || !_openedDownloadTasks.Add(id))
+            {
+                return;
+            }
 
-    private void OnDownloadManagerClicked(object? sender, RoutedEventArgs e) => ShowDownloadManager();
+            RefreshDownloads();
+            if (IsVisible)
+            {
+                ShowDownloadManager();
+            }
+            else
+            {
+                _openDownloadsWhenOpened = true;
+            }
+        });
+    }
+
+    private void OnDownloadManagerClicked(object? sender, RoutedEventArgs e)
+    {
+        ShowDownloadManager();
+    }
 
     private void ShowDownloadManager()
     {
         if (_closed || DataContext is not MainViewModel viewModel)
+        {
             return;
+        }
+
         if (_downloadManager is { } existing)
         {
             existing.RefreshDownloads();
             if (existing.WindowState == WindowState.Minimized)
+            {
                 existing.WindowState = WindowState.Normal;
+            }
+
             existing.Activate();
             return;
         }
+
         var window = new DownloadManagerWindow { DataContext = viewModel.Downloads };
         _downloadManager = window;
         window.Closed += OnDownloadManagerClosed;
@@ -139,13 +179,22 @@ public partial class MainWindow : Window
     private void OnDownloadManagerClosed(object? sender, EventArgs e)
     {
         if (sender is DownloadManagerWindow window)
+        {
             window.Closed -= OnDownloadManagerClosed;
+        }
+
         if (ReferenceEquals(_downloadManager, sender))
+        {
             _downloadManager = null;
+        }
+
         RefreshDownloads();
     }
 
-    private void OnSettingsClicked(object? sender, RoutedEventArgs e) => ShowPage(SettingsPage, "Settings");
+    private void OnSettingsClicked(object? sender, RoutedEventArgs e)
+    {
+        ShowPage(SettingsPage, "Settings");
+    }
 
     private void ShowPage(Control page, string activePage)
     {
@@ -162,17 +211,27 @@ public partial class MainWindow : Window
         PageScroll.Offset = default;
     }
 
-    private void OnMinimizeClicked(object? sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+    private void OnMinimizeClicked(object? sender, RoutedEventArgs e)
+    {
+        WindowState = WindowState.Minimized;
+    }
 
-    private void OnMaximizeClicked(object? sender, RoutedEventArgs e) =>
+    private void OnMaximizeClicked(object? sender, RoutedEventArgs e)
+    {
         WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+    }
 
-    private void OnCloseClicked(object? sender, RoutedEventArgs e) => Close();
+    private void OnCloseClicked(object? sender, RoutedEventArgs e)
+    {
+        Close();
+    }
 
     private async void OnAccountClicked(object? sender, RoutedEventArgs e)
     {
         if (_scopes is null)
+        {
             return;
+        }
 
         var accounts = new AccountWindow(_scopes)
         {
@@ -181,17 +240,23 @@ public partial class MainWindow : Window
         };
         var selectedProfileId = await ShowSelectionDialog<Guid?>(accounts);
         if (DataContext is MainViewModel viewModel)
+        {
             await viewModel.RefreshLaunchOptionsAsync(selectedProfileId);
+        }
     }
 
     private async void OnChooseInstanceClicked(object? sender, RoutedEventArgs e)
     {
         if (DataContext is not MainViewModel { CanChangeLaunchSelection: true } viewModel)
+        {
             return;
+        }
 
         await viewModel.RefreshLaunchOptionsAsync();
         if (!IsVisible)
+        {
             return;
+        }
 
         var picker = new InstancePickerWindow(viewModel)
         {
@@ -199,7 +264,9 @@ public partial class MainWindow : Window
             Height = Math.Clamp(Bounds.Height - 32, 400, 552)
         };
         if (await ShowSelectionDialog<GameInstanceData?>(picker) is { } selected)
+        {
             viewModel.SelectInstance(selected);
+        }
     }
 
     private async Task<TResult> ShowSelectionDialog<TResult>(Window window)
@@ -230,21 +297,30 @@ public partial class MainWindow : Window
 
     private async void OnLaunchClicked(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is MainViewModel viewModel && await viewModel.LaunchGameAsync(ReauthenticateProfileAsync) is { } error && IsVisible)
+        if (DataContext is MainViewModel viewModel
+            && await viewModel.LaunchGameAsync(ReauthenticateProfileAsync) is { } error && IsVisible)
+        {
             Toast.Show(this, "启动失败", ToastKind.Error, error);
+        }
     }
 
-    private void OnJavaWarning(HljuML.Core.GamePlay.JavaVersionWarning warning)
+    private void OnJavaWarning(JavaVersionWarning warning)
     {
         if (!_closed)
+        {
             Toast.Show(this, "Java 版本提醒", ToastKind.Warning,
                 $"当前版本 Java {warning.SelectedMajor} 并非实例推荐 Java 版本 Java {warning.RecommendedMajor}，可能会无法启动，请留意。");
+        }
     }
 
     /// <summary>只恢复原启动选中的档案；用户关闭窗口时取消恢复，不切换账号或离线启动。</summary>
     private async Task<bool> ReauthenticateProfileAsync(Guid profileId)
     {
-        if (_closed || !IsVisible || _scopes is null) return false;
+        if (_closed || !IsVisible || _scopes is null)
+        {
+            return false;
+        }
+
         var accounts = new AccountWindow(_scopes, profileId)
         {
             Width = Math.Clamp(Bounds.Width - 32, 540, 860),
@@ -253,5 +329,4 @@ public partial class MainWindow : Window
         var selected = await ShowSelectionDialog<Guid?>(accounts);
         return selected == profileId && accounts.ReauthenticatedProfileId == profileId;
     }
-
 }

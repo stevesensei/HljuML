@@ -9,8 +9,6 @@ namespace HljuML.App.Core;
 public sealed class GameLoaderChoice(Loaders loader) : INotifyPropertyChanged
 {
     private bool _isExpanded;
-
-    public event PropertyChangedEventHandler? PropertyChanged;
     public Loaders Loader { get; } = loader;
     public string Label => Loader.ToString();
     public Bitmap Icon => GameLoaderIcons.Get(Loader);
@@ -19,17 +17,25 @@ public sealed class GameLoaderChoice(Loaders loader) : INotifyPropertyChanged
     public string? Error { get; private set; }
     public bool IsDisabled { get; private set; } = true;
     public bool IsSelected { get; private set; }
+
     public bool IsExpanded
     {
         get => _isExpanded;
         set
         {
-            if (_isExpanded == value) return;
+            if (_isExpanded == value)
+            {
+                return;
+            }
+
             _isExpanded = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsExpanded)));
         }
     }
+
     public string Description { get; private set; } = "正在获取可用版本…";
+
+    public event PropertyChangedEventHandler? PropertyChanged;
 
     internal void Reset()
     {
@@ -53,7 +59,11 @@ public sealed class GameLoaderChoice(Loaders loader) : INotifyPropertyChanged
         var incompatible = selected != Loaders.Normal && selected != Loader;
         IsDisabled = incompatible || IsLoading || Error is not null || Versions.Count == 0;
         IsSelected = selected == Loader;
-        if (!IsSelected) IsExpanded = false;
+        if (!IsSelected)
+        {
+            IsExpanded = false;
+        }
+
         Description = incompatible ? $"与 {selected} 不兼容"
             : IsLoading ? "正在获取可用版本…"
             : Error is not null ? "获取失败，请重试"
@@ -64,8 +74,11 @@ public sealed class GameLoaderChoice(Loaders loader) : INotifyPropertyChanged
 
     private void NotifyAll()
     {
-        foreach (var property in new[] { nameof(Versions), nameof(IsLoading), nameof(Error), nameof(IsDisabled),
-            nameof(IsSelected), nameof(Description) })
+        foreach (var property in new[]
+                 {
+                     nameof(Versions), nameof(IsLoading), nameof(Error), nameof(IsDisabled),
+                     nameof(IsSelected), nameof(Description)
+                 })
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(property));
     }
 }

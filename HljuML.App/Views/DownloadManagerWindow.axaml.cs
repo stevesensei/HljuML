@@ -31,17 +31,24 @@ public partial class DownloadManagerWindow : Window
         base.OnClosed(e);
     }
 
-    private void OnRefresh(object? sender, EventArgs e) => RefreshDownloads();
+    private void OnRefresh(object? sender, EventArgs e)
+    {
+        RefreshDownloads();
+    }
 
     internal void RefreshDownloads()
     {
         if (DataContext is DownloadQueueViewModel downloads)
         {
-            downloads.Refresh(includeDetails: true);
+            downloads.Refresh(true);
             if (downloads.HasActiveDownloads)
+            {
                 _refreshTimer.Start();
+            }
             else
+            {
                 _refreshTimer.Stop();
+            }
         }
     }
 }

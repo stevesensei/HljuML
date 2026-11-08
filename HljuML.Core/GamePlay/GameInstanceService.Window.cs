@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
@@ -21,11 +22,14 @@ public sealed partial class GameInstanceService
                     ShowWindow(process.MainWindowHandle, 3);
                     return;
                 }
+
                 await Task.Delay(250, timeout.Token);
             }
         }
-        catch (OperationCanceledException) { }
-        catch (Exception error) when (error is InvalidOperationException or System.ComponentModel.Win32Exception)
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception error) when (error is InvalidOperationException or Win32Exception)
         {
             logger.LogWarning(error, "无法最大化游戏窗口");
         }

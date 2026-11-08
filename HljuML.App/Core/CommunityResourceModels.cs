@@ -23,7 +23,10 @@ public enum CommunityResourceType
 
 public sealed record CommunityTargetInstance(Guid Id, string DisplayName, string Version, string Loader)
 {
-    public override string ToString() => DisplayName;
+    public override string ToString()
+    {
+        return DisplayName;
+    }
 }
 
 public sealed record CommunityResourceItem(

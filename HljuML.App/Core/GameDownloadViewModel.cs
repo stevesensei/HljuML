@@ -16,11 +16,11 @@ public sealed partial class GameDownloadViewModel : INotifyPropertyChanged, IDis
     private readonly GameCatalogService _catalog;
     private readonly GameInstallationService _installer;
     private readonly CancellationToken _stopping;
-    private IReadOnlyList<GameVersionInfo> _versions = [];
     private string _catalogFilter = "release";
-    private string _searchText = "";
-    private bool _initialized;
     private bool _disposed;
+    private bool _initialized;
+    private string _searchText = "";
+    private IReadOnlyList<GameVersionInfo> _versions = [];
 
     public GameDownloadViewModel(GameCatalogService catalog, GameInstallationService installer,
         CancellationToken stopping)
@@ -30,7 +30,6 @@ public sealed partial class GameDownloadViewModel : INotifyPropertyChanged, IDis
         _stopping = stopping;
     }
 
-    public event PropertyChangedEventHandler? PropertyChanged;
     public bool IsCatalogLoading { get; private set; }
     public string? CatalogError { get; private set; }
     public bool HasCatalogError => CatalogError is not null;
@@ -54,7 +53,11 @@ public sealed partial class GameDownloadViewModel : INotifyPropertyChanged, IDis
         get => _catalogFilter;
         set
         {
-            if (value is not ("release" or "snapshot" or "old") || value == _catalogFilter) return;
+            if (value is not ("release" or "snapshot" or "old") || value == _catalogFilter)
+            {
+                return;
+            }
+
             _catalogFilter = value;
             RebuildRows();
             Notify(nameof(CatalogFilter));
@@ -67,17 +70,33 @@ public sealed partial class GameDownloadViewModel : INotifyPropertyChanged, IDis
         set
         {
             value ??= "";
-            if (value == _searchText) return;
+            if (value == _searchText)
+            {
+                return;
+            }
+
             _searchText = value;
             RebuildRows();
             Notify(nameof(SearchText));
         }
     }
 
+    public void Dispose()
+    {
+        _disposed = true;
+        _loaderRequest?.Cancel();
+        _loaderRequest?.Dispose();
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
     public Task InitializeAsync()
     {
         if (_initialized || _disposed)
+        {
             return Task.CompletedTask;
+        }
+
         _initialized = true;
         return RefreshCatalogAsync();
     }
@@ -85,16 +104,23 @@ public sealed partial class GameDownloadViewModel : INotifyPropertyChanged, IDis
     public async Task RefreshCatalogAsync()
     {
         if (IsCatalogLoading || _disposed)
+        {
             return;
+        }
+
         IsCatalogLoading = true;
         CatalogError = null;
         NotifyCatalog();
         try
         {
-            var result = await _catalog.GetVersionsAsync(refresh: HasVersions, cancellationToken: _stopping);
+            var result = await _catalog.GetVersionsAsync(HasVersions, _stopping);
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                if (_disposed) return;
+                if (_disposed)
+                {
+                    return;
+                }
+
                 CatalogError = result.Status == ServiceStatus.Success ? null : result.Message;
                 if (result.Data is { } versions)
                 {
@@ -107,13 +133,18 @@ public sealed partial class GameDownloadViewModel : INotifyPropertyChanged, IDis
                 }
             });
         }
-        catch (OperationCanceledException) when (_stopping.IsCancellationRequested) { }
+        catch (OperationCanceledException) when (_stopping.IsCancellationRequested)
+        {
+        }
         finally
         {
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 IsCatalogLoading = false;
-                if (!_disposed) NotifyCatalog();
+                if (!_disposed)
+                {
+                    NotifyCatalog();
+                }
             });
         }
     }
@@ -138,26 +169,29 @@ public sealed partial class GameDownloadViewModel : INotifyPropertyChanged, IDis
         Notify(nameof(IsCatalogFilteredEmpty));
     }
 
-    private static GameCatalogRow? ToRow(GameVersionInfo? version, string? prefix) => version is null ? null
-        : new GameCatalogRow(version, "", version.Id,
-            string.Join(" · ", new[] { prefix, version.ReleasedAt?.ToLocalTime().ToString("yyyy/MM/dd HH:mm") }
-                .Where(part => !string.IsNullOrEmpty(part))));
+    private static GameCatalogRow? ToRow(GameVersionInfo? version, string? prefix)
+    {
+        return version is null
+            ? null
+            : new GameCatalogRow(version, "", version.Id,
+                string.Join(" · ", new[] { prefix, version.ReleasedAt?.ToLocalTime().ToString("yyyy/MM/dd HH:mm") }
+                    .Where(part => !string.IsNullOrEmpty(part))));
+    }
 
     private void NotifyCatalog()
     {
-        foreach (var name in new[] { nameof(IsCatalogLoading), nameof(CatalogError), nameof(HasCatalogError),
-            nameof(HasVersions), nameof(IsCatalogEmpty), nameof(LatestRelease), nameof(LatestSnapshot),
-            nameof(HasLatestRelease), nameof(HasLatestSnapshot), nameof(HasCatalogRows),
-            nameof(IsCatalogFilteredEmpty) }) Notify(name);
+        foreach (var name in new[]
+                 {
+                     nameof(IsCatalogLoading), nameof(CatalogError), nameof(HasCatalogError),
+                     nameof(HasVersions), nameof(IsCatalogEmpty), nameof(LatestRelease), nameof(LatestSnapshot),
+                     nameof(HasLatestRelease), nameof(HasLatestSnapshot), nameof(HasCatalogRows),
+                     nameof(IsCatalogFilteredEmpty)
+                 }) Notify(name);
     }
 
-    private void Notify(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-
-    public void Dispose()
+    private void Notify(string name)
     {
-        _disposed = true;
-        _loaderRequest?.Cancel();
-        _loaderRequest?.Dispose();
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }
 }
 

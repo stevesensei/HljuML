@@ -13,6 +13,10 @@ public sealed class OperationCoordinatorService
     private sealed class Lease(SemaphoreSlim gate) : IDisposable
     {
         private SemaphoreSlim? _gate = gate;
-        public void Dispose() => Interlocked.Exchange(ref _gate, null)?.Release();
+
+        public void Dispose()
+        {
+            Interlocked.Exchange(ref _gate, null)?.Release();
+        }
     }
 }

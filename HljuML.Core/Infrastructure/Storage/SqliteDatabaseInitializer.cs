@@ -15,19 +15,26 @@ public sealed class SqliteDatabaseInitializer(IServiceScopeFactory scopeFactory)
 
         var databasePath = context.Database.GetDbConnection().DataSource;
         if (Path.GetDirectoryName(databasePath) is { Length: > 0 } directory)
+        {
             Directory.CreateDirectory(directory);
+        }
 
         //ImportLegacyDatabase(databasePath, cancellationToken);
         await context.Database.MigrateAsync(cancellationToken);
         //await AssignDefaultGameFolder(context, cancellationToken);
     }
 
-    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
+    }
 
     private static void ImportLegacyDatabase(string databasePath, CancellationToken cancellationToken)
     {
         if (File.Exists(databasePath) || !File.Exists(LauncherPaths.LegacyDatabasePath))
+        {
             return;
+        }
 
         cancellationToken.ThrowIfCancellationRequested();
         var temporaryPath = $"{databasePath}.{Guid.NewGuid():N}.tmp";
@@ -50,19 +57,22 @@ public sealed class SqliteDatabaseInitializer(IServiceScopeFactory scopeFactory)
         }
     }
 
-    private static SqliteConnection CreateConnection(string path, SqliteOpenMode mode) =>
-        new(new SqliteConnectionStringBuilder
+    private static SqliteConnection CreateConnection(string path, SqliteOpenMode mode)
+    {
+        return new SqliteConnection(new SqliteConnectionStringBuilder
         {
             DataSource = path,
             Mode = mode,
             Pooling = false
         }.ToString());
+    }
 
     private static async Task AssignDefaultGameFolder(HljuMLDbContext context, CancellationToken cancellationToken)
     {
         var path = LauncherPaths.DefaultInstanceDirectory;
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
-        var folder = await context.GameFolders.FirstOrDefaultAsync(item => item.AbsolutePath == path, cancellationToken);
+        var folder =
+            await context.GameFolders.FirstOrDefaultAsync(item => item.AbsolutePath == path, cancellationToken);
         if (folder is null)
         {
             folder = new GameFolder { Id = Guid.NewGuid(), AbsolutePath = path, Name = "实例目录" };

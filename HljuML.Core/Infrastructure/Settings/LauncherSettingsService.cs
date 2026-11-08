@@ -5,15 +5,35 @@ using ColorMC.Core.Config;
 using ColorMC.Core.Net;
 using ColorMC.Core.Objs;
 using HljuML.Core.Infrastructure.Storage;
-using Microsoft.Extensions.Logging;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 namespace HljuML.Core.Infrastructure.Settings;
 
-public enum LauncherStartBehavior { KeepOpen, Minimize, Close }
-public enum GameWindowMode { Default, Fullscreen, Maximized }
-public enum LauncherBackground { Default, RandomImage }
-public enum CommunityDownloadSource { Official, Mcim }
+public enum LauncherStartBehavior
+{
+    KeepOpen,
+    Minimize,
+    Close
+}
+
+public enum GameWindowMode
+{
+    Default,
+    Fullscreen,
+    Maximized
+}
+
+public enum LauncherBackground
+{
+    Default,
+    RandomImage
+}
+
+public enum CommunityDownloadSource
+{
+    Official,
+    Mcim
+}
 
 public sealed record LauncherSettings
 {
@@ -38,6 +58,7 @@ public sealed class LauncherSettingsService
     {
         WriteIndented = true, Converters = { new JsonStringEnumConverter() }
     };
+
     private readonly object _sync = new();
     private LauncherSettings _value = new();
     private bool _frameworkReady;
@@ -60,7 +81,8 @@ public sealed class LauncherSettingsService
                 _value = value;
             }
         }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException or ArgumentException)
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException
+                                          or ArgumentException)
         {
             LoadError = $"无法读取设置，已使用默认值。请检查 {SettingsPath}。{error.Message}";
         }
@@ -72,7 +94,11 @@ public sealed class LauncherSettingsService
         {
             var next = change(_value);
             Validate(next);
-            if (next == _value) return;
+            if (next == _value)
+            {
+                return;
+            }
+
             Directory.CreateDirectory(LauncherPaths.ColorMcDirectory);
             var temporary = SettingsPath + ".tmp";
             try
@@ -80,11 +106,22 @@ public sealed class LauncherSettingsService
                 File.WriteAllText(temporary, JsonSerializer.Serialize(next, JsonOptions));
                 File.Move(temporary, SettingsPath, true);
             }
-            finally { if (File.Exists(temporary)) File.Delete(temporary); }
+            finally
+            {
+                if (File.Exists(temporary))
+                {
+                    File.Delete(temporary);
+                }
+            }
+
             Volatile.Write(ref _value, next);
             LoadError = null;
-            if (_frameworkReady) ApplyFrameworkDefaults();
+            if (_frameworkReady)
+            {
+                ApplyFrameworkDefaults();
+            }
         }
+
         Changed?.Invoke();
     }
 
@@ -115,21 +152,41 @@ public sealed class LauncherSettingsService
     public static void Validate(LauncherSettings value)
     {
         if (value.MaximumMemoryGb is < 0.25m or > 1024m)
+        {
             throw new ArgumentException("最大内存请输入 0.25–1024 G。实例自己的内存设置优先。");
+        }
+
         if (value.DownloadThreads is < 1 or > 128)
+        {
             throw new ArgumentException("下载线程数请输入 1–128 的整数。");
+        }
+
         if (value.DownloadLimitMb is < 0 or > 100000)
+        {
             throw new ArgumentException("下载限速请输入 0–100000 M/s，0 表示不限速。");
+        }
+
         if (value.JvmArguments is null || value.JvmArguments.Length > 32768)
+        {
             throw new ArgumentException("JVM 参数不能超过 32768 个字符。");
+        }
+
         if (Regex.IsMatch(value.JvmArguments, @"(^|\s)-Xm[sx]", RegexOptions.IgnoreCase))
+        {
             throw new ArgumentException("请通过内存分配设置最大内存，不要在 JVM 参数中填写 -Xmx 或 -Xms。");
+        }
+
         if (value.MuaOrganizationId is null || value.MuaOrganizationId.Length > 256)
+        {
             throw new ArgumentException("MUA 组织 ID 不能超过 256 个字符。");
+        }
+
         if (!Enum.IsDefined(value.AfterGameStart) || !Enum.IsDefined(value.GameWindow)
             || !Enum.IsDefined(value.Background) || !Enum.IsDefined(value.CommunitySource)
             || value.MinecraftSource is not (SourceLocal.Offical or SourceLocal.BMCLAPI)
             || value.MinimumLogLevel is < LogLevel.Trace or > LogLevel.Critical)
+        {
             throw new ArgumentException("设置包含不支持的选项，请重新选择。");
+        }
     }
 }

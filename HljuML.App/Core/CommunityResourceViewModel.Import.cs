@@ -2,8 +2,6 @@ using System;
 using System.Data.Common;
 using System.IO;
 using System.Threading.Tasks;
-using HljuML.Core.GamePlay;
-using HljuML.Shared.Model;
 
 namespace HljuML.App.Core;
 
@@ -16,24 +14,39 @@ public sealed partial class CommunityResourceViewModel
     /// <summary>选择本地整合包并提交安装队列；任务创建事件会打开已有下载管理器。</summary>
     public async Task ImportModpackAsync(Func<Task<string?>> chooseFile, Func<string, Task> confirm)
     {
-        if (_disposed || IsImporting) return;
+        if (_disposed || IsImporting)
+        {
+            return;
+        }
+
         IsImporting = true;
         ImportError = null;
         NotifyImportState();
         try
         {
             var file = await chooseFile();
-            if (file is null || _disposed) return;
+            if (file is null || _disposed)
+            {
+                return;
+            }
+
             await confirm(file);
         }
-        catch (OperationCanceledException) when (_stopping.IsCancellationRequested) { }
+        catch (OperationCanceledException) when (_stopping.IsCancellationRequested)
+        {
+        }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException
-            or NotSupportedException or DbException)
-        { ImportError = $"无法导入整合包：{error.Message}"; }
+                                          or NotSupportedException or DbException)
+        {
+            ImportError = $"无法导入整合包：{error.Message}";
+        }
         finally
         {
             IsImporting = false;
-            if (!_disposed) NotifyImportState();
+            if (!_disposed)
+            {
+                NotifyImportState();
+            }
         }
     }
 

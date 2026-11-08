@@ -12,7 +12,11 @@ public sealed class ModpackImportSession : IDisposable
     private bool _disposed;
 
     internal ModpackImportSession(string archive, ModpackInfo info, ILogger logger)
-    { _archive = archive; Info = info; _logger = logger; }
+    {
+        _archive = archive;
+        Info = info;
+        _logger = logger;
+    }
 
     public ModpackInfo Info { get; }
     public string SuggestedName => $"{Info.Name}-{Info.PackVersion}";
@@ -34,8 +38,13 @@ public sealed class ModpackImportSession : IDisposable
     {
         lock (_sync)
         {
-            if (!_disposed) { _archive = archive; return; }
+            if (!_disposed)
+            {
+                _archive = archive;
+                return;
+            }
         }
+
         ModpackImportService.ReleaseArchive(archive, _logger);
     }
 
@@ -43,7 +52,16 @@ public sealed class ModpackImportSession : IDisposable
     public void Dispose()
     {
         string? archive;
-        lock (_sync) { _disposed = true; archive = _archive; _archive = null; }
-        if (archive is not null) ModpackImportService.ReleaseArchive(archive, _logger);
+        lock (_sync)
+        {
+            _disposed = true;
+            archive = _archive;
+            _archive = null;
+        }
+
+        if (archive is not null)
+        {
+            ModpackImportService.ReleaseArchive(archive, _logger);
+        }
     }
 }

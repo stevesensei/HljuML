@@ -6,17 +6,32 @@ namespace HljuML.App.Views;
 
 public partial class ModpackImportDialog : UserControl
 {
-    public ModpackImportDialog() => InitializeComponent();
+    public ModpackImportDialog()
+    {
+        InitializeComponent();
+    }
+
     private void OnCancelClicked(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is ModpackImportViewModel { CanDismiss: true } viewModel) viewModel.IsOpen = false;
+        if (DataContext is ModpackImportViewModel { CanDismiss: true } viewModel)
+        {
+            viewModel.IsOpen = false;
+        }
     }
+
     private async void OnConfirmClicked(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is ModpackImportViewModel viewModel) await viewModel.ConfirmAsync();
+        if (DataContext is ModpackImportViewModel viewModel)
+        {
+            await viewModel.ConfirmAsync();
+        }
     }
+
     private async void OnRetryClicked(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is ModpackImportViewModel viewModel) await viewModel.LoadAsync();
+        if (DataContext is ModpackImportViewModel viewModel)
+        {
+            await viewModel.LoadAsync();
+        }
     }
 }

@@ -8,12 +8,13 @@ using Microsoft.EntityFrameworkCore;
 namespace HljuML.Core.GamePlay.Auth;
 
 /// <summary>
-/// Ygg服务器认证
+///     Ygg服务器认证
 /// </summary>
 /// <param name="db"></param>
 public sealed class AuthServerService(HljuMLDbContext db)
 {
     private const string ApiLocationHeader = "X-Authlib-Injector-API-Location";
+
     private static readonly HttpClient MetadataClient = new(new SocketsHttpHandler
     {
         PooledConnectionLifetime = TimeSpan.FromMinutes(5),
@@ -26,7 +27,7 @@ public sealed class AuthServerService(HljuMLDbContext db)
     };
 
     /// <summary>
-    /// 获取全部认证服务器
+    ///     获取全部认证服务器
     /// </summary>
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
@@ -61,7 +62,9 @@ public sealed class AuthServerService(HljuMLDbContext db)
         ResolvedYggdrasilServer resolved, CancellationToken cancellationToken = default)
     {
         if (!resolved.ApiUri.IsAbsoluteUri || ParseServerUri(resolved.ApiUri.AbsoluteUri) is null)
+        {
             return ServiceResult<CustomAuthServer>.FailureResult(message: "请输入有效的 Yggdrasil 服务器地址。");
+        }
 
         var server = ToEntity(resolved);
         server.Id = Guid.NewGuid();
@@ -83,13 +86,17 @@ public sealed class AuthServerService(HljuMLDbContext db)
     {
         var result = await GetYggdrasilServerMetadata(address, cancellationToken);
         if (result.Data is not { } resolved)
+        {
             return ServiceResult<CustomAuthServer>.FailureResult(message: result.Message);
+        }
 
         var server = ToEntity(resolved);
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var existing = await GetAuthServer(serverId, cancellationToken);
         if (existing.Data is not { } previous)
+        {
             return existing;
+        }
 
         await db.CustomAuthServers.Where(item => item.Id == serverId)
             .ExecuteUpdateAsync(setters => setters
@@ -115,10 +122,13 @@ public sealed class AuthServerService(HljuMLDbContext db)
     {
         var result = await GetAuthServer(serverId, cancellationToken);
         if (result.Data is null)
+        {
             return result;
+        }
 
         var deleted = await db.CustomAuthServers
-            .Where(server => server.Id == serverId && !db.PlayerProfiles.Any(profile => profile.AuthServerId == server.Id))
+            .Where(server =>
+                server.Id == serverId && !db.PlayerProfiles.Any(profile => profile.AuthServerId == server.Id))
             .ExecuteDeleteAsync(cancellationToken);
 
         return deleted == 0
@@ -131,7 +141,9 @@ public sealed class AuthServerService(HljuMLDbContext db)
     {
         var apiUri = ParseServerUri(address);
         if (apiUri is null)
+        {
             return ServiceResult<ResolvedYggdrasilServer>.FailureResult(message: "请输入有效的 Yggdrasil 服务器地址。");
+        }
 
         var visited = new HashSet<Uri>();
         try
@@ -141,13 +153,17 @@ public sealed class AuthServerService(HljuMLDbContext db)
                 using var response = await MetadataClient.GetAsync(apiUri, cancellationToken);
                 var responseUri = response.RequestMessage?.RequestUri ?? apiUri;
                 if (ParseServerUri(responseUri.AbsoluteUri) is null)
+                {
                     return ServiceResult<ResolvedYggdrasilServer>.FailureResult(message: "认证服务器重定向地址无效。");
+                }
 
                 if (response.Headers.TryGetValues(ApiLocationHeader, out var values))
                 {
                     if (!Uri.TryCreate(responseUri, values.FirstOrDefault(), out var location)
                         || ParseServerUri(location.AbsoluteUri) is null)
+                    {
                         return ServiceResult<ResolvedYggdrasilServer>.FailureResult(message: "认证服务器声明的 API 地址无效。");
+                    }
 
                     if (location != responseUri)
                     {
@@ -159,9 +175,11 @@ public sealed class AuthServerService(HljuMLDbContext db)
                 response.EnsureSuccessStatusCode();
                 var metadata = await response.Content.ReadFromJsonAsync<YggdrasilServerMetadata>(cancellationToken);
                 if (metadata is not null && (metadata.Meta is not null || metadata.SkinDomains is not null
-                    || !string.IsNullOrWhiteSpace(metadata.SignaturePublicKey)))
+                        || !string.IsNullOrWhiteSpace(
+                            metadata.SignaturePublicKey)))
                 {
-                    return ServiceResult<ResolvedYggdrasilServer>.SuccessResult(new(responseUri, metadata));
+                    return ServiceResult<ResolvedYggdrasilServer>.SuccessResult(
+                        new ResolvedYggdrasilServer(responseUri, metadata));
                 }
 
                 return ServiceResult<ResolvedYggdrasilServer>.FailureResult(message: "响应中没有 Yggdrasil 元数据。");
@@ -174,14 +192,16 @@ public sealed class AuthServerService(HljuMLDbContext db)
             return ServiceResult<ResolvedYggdrasilServer>.FailureResult(message: "Yggdrasil 元数据的 JSON 格式无效。");
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException
-            || ex is OperationCanceledException && !cancellationToken.IsCancellationRequested)
+                                   || (ex is OperationCanceledException && !cancellationToken.IsCancellationRequested))
         {
             return ServiceResult<ResolvedYggdrasilServer>.FailureResult(message: "无法读取认证服务器信息，请检查地址或网络。");
         }
     }
 
-    internal static string? NormalizeServerAddress(string? address) =>
-        ParseServerUri(address)?.AbsoluteUri.TrimEnd('/');
+    internal static string? NormalizeServerAddress(string? address)
+    {
+        return ParseServerUri(address)?.AbsoluteUri.TrimEnd('/');
+    }
 
     private static CustomAuthServer ToEntity(ResolvedYggdrasilServer resolved)
     {
@@ -192,21 +212,30 @@ public sealed class AuthServerService(HljuMLDbContext db)
             Address = resolved.ApiUri.AbsoluteUri.TrimEnd('/'),
             RegisterAddress = !string.IsNullOrWhiteSpace(register)
                 && Uri.TryCreate(resolved.ApiUri, register.Trim(), out var registerUri)
-                && IsWebUri(registerUri) ? registerUri.AbsoluteUri : string.Empty
+                && IsWebUri(registerUri)
+                    ? registerUri.AbsoluteUri
+                    : string.Empty
         };
     }
 
-    private static Uri? ParseServerUri(string? address) =>
-        Uri.TryCreate(address, UriKind.Absolute, out var uri) && IsWebUri(uri)
-            && uri.Query.Length == 0 && uri.Fragment.Length == 0 ? uri : null;
+    private static Uri? ParseServerUri(string? address)
+    {
+        return Uri.TryCreate(address, UriKind.Absolute, out var uri) && IsWebUri(uri)
+            && uri.Query.Length == 0 && uri.Fragment.Length == 0
+                ? uri
+                : null;
+    }
 
-    private static bool IsWebUri(Uri uri) =>
-        (uri.Scheme == Uri.UriSchemeHttps || (uri.Scheme == Uri.UriSchemeHttp && uri.IsLoopback))
-        && uri.Host.Length > 0 && uri.UserInfo.Length == 0;
+    private static bool IsWebUri(Uri uri)
+    {
+        return (uri.Scheme == Uri.UriSchemeHttps || (uri.Scheme == Uri.UriSchemeHttp && uri.IsLoopback))
+            && uri.Host.Length > 0 && uri.UserInfo.Length == 0;
+    }
 }
 
 public sealed record ResolvedYggdrasilServer(Uri ApiUri, YggdrasilServerMetadata Metadata)
 {
     public string DisplayName => string.IsNullOrWhiteSpace(Metadata.Meta?.ServerName)
-        ? ApiUri.Host : Metadata.Meta.ServerName.Trim();
+        ? ApiUri.Host
+        : Metadata.Meta.ServerName.Trim();
 }

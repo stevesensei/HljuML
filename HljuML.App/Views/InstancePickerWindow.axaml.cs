@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Controls;
@@ -17,7 +18,10 @@ public partial class InstancePickerWindow : Window
 {
     private readonly MainViewModel? _viewModel;
 
-    public InstancePickerWindow() => InitializeComponent();
+    public InstancePickerWindow()
+    {
+        InitializeComponent();
+    }
 
     internal InstancePickerWindow(MainViewModel viewModel) : this()
     {
@@ -44,9 +48,13 @@ public partial class InstancePickerWindow : Window
             new InstancePickerGroup(folder.Name, folder.AbsolutePath, folder.Id, rowsByFolder[folder.Id].ToArray())));
         var unassigned = rowsByFolder[null].ToArray();
         if (unassigned.Length > 0)
+        {
             groups.Add(new InstancePickerGroup("未分配目录", null, null, unassigned));
+        }
 
-        var defaultFolder = viewModel.AvailableFolders.FirstOrDefault(folder => LauncherPaths.IsDefaultInstanceDirectory(folder.AbsolutePath));
+        var defaultFolder =
+            viewModel.AvailableFolders.FirstOrDefault(folder =>
+                LauncherPaths.IsDefaultInstanceDirectory(folder.AbsolutePath));
         DefaultFolderButton.Content = defaultFolder is null ? "添加默认目录" : "扫描默认目录";
         var selected = rows.FirstOrDefault(row => row.Instance.Id == viewModel.SelectedInstanceId);
         var preferredFolder = folderId ?? selected?.Instance.GameFolderId ?? defaultFolder?.Id;
@@ -56,33 +64,42 @@ public partial class InstancePickerWindow : Window
         InstancesList.SelectedItem = group.Instances.FirstOrDefault(row => row == selected);
     }
 
-    private async void OnAddDefaultFolderClicked(object? sender, RoutedEventArgs e) =>
+    private async void OnAddDefaultFolderClicked(object? sender, RoutedEventArgs e)
+    {
         await AddFolderAsync(LauncherPaths.DefaultInstanceDirectory);
+    }
 
     private async void OnBrowseFolderClicked(object? sender, RoutedEventArgs e)
     {
         if (_viewModel is null)
+        {
             return;
+        }
 
         try
         {
             var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
             {
                 Title = "选择游戏实例目录",
-                SuggestedStartLocation = await StorageProvider.TryGetFolderFromPathAsync(LauncherPaths.DefaultInstanceDirectory)
+                SuggestedStartLocation =
+                    await StorageProvider.TryGetFolderFromPathAsync(LauncherPaths.DefaultInstanceDirectory)
             });
             if (folders.FirstOrDefault() is { } folder)
             {
                 using (folder)
                 {
                     if (folder.TryGetLocalPath() is { } path)
+                    {
                         await AddFolderAsync(path);
+                    }
                     else
+                    {
                         ShowFolderError("请选择本地文件夹。");
+                    }
                 }
             }
         }
-        catch (Exception error) when (error is System.IO.IOException or UnauthorizedAccessException or NotSupportedException)
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or NotSupportedException)
         {
             ShowFolderError("无法打开文件夹选择器。");
         }
@@ -91,7 +108,9 @@ public partial class InstancePickerWindow : Window
     private async Task AddFolderAsync(string path)
     {
         if (_viewModel is not { } viewModel || !IsVisible || !FolderActions.IsEnabled)
+        {
             return;
+        }
 
         FolderActions.IsEnabled = false;
         FolderError.IsVisible = false;
@@ -99,7 +118,10 @@ public partial class InstancePickerWindow : Window
         {
             var result = await viewModel.AddGameFolderAsync(path);
             if (!IsVisible)
+            {
                 return;
+            }
+
             if (result.Data is not { } folder)
             {
                 ShowFolderError(result.Message);
@@ -108,9 +130,13 @@ public partial class InstancePickerWindow : Window
 
             await viewModel.RefreshLaunchOptionsAsync();
             if (IsVisible)
+            {
                 SetCatalog(viewModel, folder.Id);
+            }
         }
-        catch (OperationCanceledException) { }
+        catch (OperationCanceledException)
+        {
+        }
         finally
         {
             FolderActions.IsEnabled = true;
@@ -126,7 +152,9 @@ public partial class InstancePickerWindow : Window
     private void OnGroupChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (GroupsList.SelectedItem is not InstancePickerGroup group)
+        {
             return;
+        }
 
         var selection = InstancesList.SelectedItem;
         GroupTitle.Text = group.Name;
@@ -136,16 +164,23 @@ public partial class InstancePickerWindow : Window
         EmptyInstances.IsVisible = group.Count == 0;
     }
 
-    private void OnInstanceChanged(object? sender, SelectionChangedEventArgs e) =>
+    private void OnInstanceChanged(object? sender, SelectionChangedEventArgs e)
+    {
         UseInstanceButton.IsEnabled = InstancesList.SelectedItem is InstancePickerRow;
+    }
 
     private void OnUseInstanceClicked(object? sender, RoutedEventArgs e)
     {
         if (InstancesList.SelectedItem is InstancePickerRow row)
+        {
             Close(row.Instance);
+        }
     }
 
-    private void OnCancelClicked(object? sender, RoutedEventArgs e) => Close();
+    private void OnCancelClicked(object? sender, RoutedEventArgs e)
+    {
+        Close();
+    }
 
     protected override void OnKeyDown(KeyEventArgs e)
     {
@@ -157,15 +192,21 @@ public partial class InstancePickerWindow : Window
         }
     }
 
-    private static string LoaderName(Loaders loader) => loader switch
+    private static string LoaderName(Loaders loader)
     {
-        Loaders.Normal => "原版",
-        Loaders.Custom => "自定义",
-        _ => loader.ToString()
-    };
+        return loader switch
+        {
+            Loaders.Normal => "原版",
+            Loaders.Custom => "自定义",
+            _ => loader.ToString()
+        };
+    }
 }
 
-public sealed record InstancePickerGroup(string Name, string? AbsolutePath, Guid? FolderId,
+public sealed record InstancePickerGroup(
+    string Name,
+    string? AbsolutePath,
+    Guid? FolderId,
     IReadOnlyList<InstancePickerRow> Instances)
 {
     public int Count => Instances.Count;
@@ -174,5 +215,6 @@ public sealed record InstancePickerGroup(string Name, string? AbsolutePath, Guid
 
 public sealed record InstancePickerRow(GameInstanceData Instance, string Loader)
 {
-    public string Description => string.IsNullOrWhiteSpace(Instance.Version) ? Loader : $"{Instance.Version} · {Loader}";
+    public string Description =>
+        string.IsNullOrWhiteSpace(Instance.Version) ? Loader : $"{Instance.Version} · {Loader}";
 }

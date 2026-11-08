@@ -1,12 +1,18 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Layout;
 using HljuML.App.Core;
+using TKCode.Arc;
 
 namespace HljuML.App.Views.Downloads;
 
 public partial class GameInstallationView : UserControl
 {
-    public GameInstallationView() => InitializeComponent();
+    public GameInstallationView()
+    {
+        InitializeComponent();
+    }
+
     private void OnSizeChanged(object? sender, SizeChangedEventArgs e)
     {
         var isNarrow = e.NewSize.Width < 560;
@@ -23,29 +29,52 @@ public partial class GameInstallationView : UserControl
         InstallFooter.RowDefinitions = RowDefinitions.Parse(isNarrow ? "Auto,Auto" : "Auto");
         Grid.SetColumn(InstallButton, isNarrow ? 0 : 1);
         Grid.SetRow(InstallButton, isNarrow ? 1 : 0);
-        InstallButton.HorizontalAlignment = isNarrow ? Avalonia.Layout.HorizontalAlignment.Stretch
-            : Avalonia.Layout.HorizontalAlignment.Right;
+        InstallButton.HorizontalAlignment = isNarrow
+            ? HorizontalAlignment.Stretch
+            : HorizontalAlignment.Right;
     }
+
     private void OnBackClicked(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is GameDownloadViewModel viewModel) viewModel.BackToCatalog();
+        if (DataContext is GameDownloadViewModel viewModel)
+        {
+            viewModel.BackToCatalog();
+        }
     }
+
     private void OnRemoveLoaderClicked(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is GameDownloadViewModel viewModel) viewModel.RemoveLoader();
+        if (DataContext is GameDownloadViewModel viewModel)
+        {
+            viewModel.RemoveLoader();
+        }
     }
+
     private void OnLoaderExpandedChanged(object? sender, RoutedEventArgs e)
     {
         if (DataContext is GameDownloadViewModel viewModel
-            && sender is TKCode.Arc.ExpandableCard { IsExpanded: true, DataContext: GameLoaderChoice { IsSelected: false } choice })
+            && sender is ExpandableCard
+            {
+                IsExpanded: true, DataContext: GameLoaderChoice { IsSelected: false } choice
+            })
+        {
             viewModel.SelectLoader(choice);
+        }
     }
+
     private async void OnRetryLoadersClicked(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is GameDownloadViewModel viewModel) await viewModel.RetryLoadersAsync();
+        if (DataContext is GameDownloadViewModel viewModel)
+        {
+            await viewModel.RetryLoadersAsync();
+        }
     }
+
     private async void OnInstallClicked(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is GameDownloadViewModel viewModel) await viewModel.InstallAsync();
+        if (DataContext is GameDownloadViewModel viewModel)
+        {
+            await viewModel.InstallAsync();
+        }
     }
 }

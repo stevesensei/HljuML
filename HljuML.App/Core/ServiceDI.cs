@@ -1,10 +1,12 @@
 ﻿using HljuML.Core.GamePlay;
-using HljuML.Core.Infrastructure.Storage;
+using HljuML.Core.GamePlay.Auth;
 using HljuML.Core.Infrastructure.Downloads;
+using HljuML.Core.Infrastructure.Logging;
+using HljuML.Core.Infrastructure.Settings;
+using HljuML.Core.Infrastructure.Storage;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using HljuML.Core.GamePlay.Auth;
 
 namespace HljuML.App.Core;
 
@@ -38,8 +40,8 @@ public static class ServiceCollectionExtensions
         collection.AddSingleton<MainViewModel>();
         collection.AddSingleton(services => new MainWindow(services.GetRequiredService<IServiceScopeFactory>(),
             services.GetRequiredService<DownloadManagementService>(),
-            services.GetRequiredService<HljuML.Core.Infrastructure.Settings.LauncherSettingsService>(),
-            services.GetRequiredService<HljuML.Core.Infrastructure.Logging.LauncherFileLoggerProvider>())
+            services.GetRequiredService<LauncherSettingsService>(),
+            services.GetRequiredService<LauncherFileLoggerProvider>())
         {
             DataContext = services.GetRequiredService<MainViewModel>()
         });
