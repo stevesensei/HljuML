@@ -1,0 +1,102 @@
+name: Build desktop packages
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_NOLOGO: 'true'
+
+jobs:
+  publish:
+    name: Publish ${{ matrix.rid }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+            archive: zip
+          - os: macos-15-intel
+            rid: osx-x64
+            archive: tar.gz
+          - os: ubuntu-24.04
+            rid: linux-x64
+            archive: tar.gz
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      TARGET_RID: ${{ matrix.rid }}
+      ARCHIVE_EXTENSION: ${{ matrix.archive }}
+
+    steps:
+      - name: Check out source and submodules
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish self-contained single-file launcher
+        run: >-
+          dotnet publish HljuML.App/HljuML.App.csproj
+          --configuration Release
+          --runtime $env:TARGET_RID
+          --self-contained true
+          --output "publish/$env:TARGET_RID"
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:IncludeAllContentForSelfExtract=true
+          -p:PublishTrimmed=false
+          -p:DebugType=None
+          -p:DebugSymbols=false
+          -p:IncludeSymbolsInSingleFile=false
+
+      - name: Package launcher without PDB files
+        run: |
+          $publishDirectory = Join-Path $PWD "publish/$env:TARGET_RID"
+          $artifactDirectory = Join-Path $PWD 'artifacts'
+          $archivePath = Join-Path $artifactDirectory "HljuML-$env:TARGET_RID.$env:ARCHIVE_EXTENSION"
+          $executableName = if ($env:TARGET_RID -eq 'win-x64') { 'HljuML.App.exe' } else { 'HljuML.App' }
+          $executablePath = Join-Path $publishDirectory $executableName
+          if (-not (Test-Path -LiteralPath $executablePath -PathType Leaf)) {
+            throw "Published executable was not found: $executablePath"
+          }
+
+          Get-ChildItem -LiteralPath $publishDirectory -Recurse -File -Filter '*.pdb' |
+            ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force }
+
+          Copy-Item -LiteralPath 'LICENSE', 'THIRD_PARTY_NOTICES.md', 'README.md', 'README.zh-CN.md' -Destination $publishDirectory
+          $licenseDirectory = Join-Path $publishDirectory 'licenses'
+          New-Item -ItemType Directory -Path $licenseDirectory -Force | Out-Null
+          Copy-Item -LiteralPath 'LibColorMC/LICENSE' -Destination (Join-Path $licenseDirectory 'ColorMC-LICENSE.txt')
+          New-Item -ItemType Directory -Path $artifactDirectory -Force | Out-Null
+
+          if ($env:TARGET_RID -eq 'win-x64') {
+            Compress-Archive -Path (Join-Path $publishDirectory '*') -DestinationPath $archivePath -CompressionLevel Optimal
+          } else {
+            & chmod +x $executablePath
+            if ($LASTEXITCODE -ne 0) { throw 'Failed to set executable permissions.' }
+            & tar -czf $archivePath -C $publishDirectory .
+            if ($LASTEXITCODE -ne 0) { throw 'Failed to create the platform archive.' }
+          }
+
+      - name: Upload platform package
+        uses: actions/upload-artifact@v7
+        with:
+          name: HljuML-${{ matrix.rid }}
+          path: artifacts/HljuML-${{ matrix.rid }}.${{ matrix.archive }}
+          if-no-files-found: error
+          compression-level: 0
