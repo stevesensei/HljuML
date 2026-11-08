@@ -81,10 +81,10 @@ public partial class GameDownloadView : UserControl
         if (DataContext is GameDownloadViewModel viewModel) viewModel.RemoveLoader();
     }
 
-    private void OnLoaderClicked(object? sender, RoutedEventArgs e)
+    private void OnLoaderExpandedChanged(object? sender, RoutedEventArgs e)
     {
         if (DataContext is GameDownloadViewModel viewModel
-            && sender is Control { DataContext: GameLoaderChoice choice })
+            && sender is TKCode.Arc.ExpandableCard { IsExpanded: true, DataContext: GameLoaderChoice { IsSelected: false } choice })
             viewModel.SelectLoader(choice);
     }
 

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Threading.Channels;
+using ColorMC.Core;
 using HljuML.Shared.Model;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -93,7 +94,8 @@ public sealed partial class DownloadManagementService(ILogger<DownloadManagement
         lock (_sync)
             _queue.Writer.TryComplete();
 
-        await base.StopAsync(cancellationToken).ConfigureAwait(false);
+        try { await base.StopAsync(cancellationToken).ConfigureAwait(false); }
+        finally { ColorMCCore.Error -= LogColorMcError; }
     }
 
     private async Task RunWorkerAsync(CancellationToken stoppingToken)
@@ -143,6 +145,8 @@ public sealed partial class DownloadManagementService(ILogger<DownloadManagement
             Report(item with { Status = DownloadItemStatus.Downloading });
             if (File.Exists(path) || Directory.Exists(path))
             {
+                logger.LogWarning("下载目标已存在：{FileName}；来源 {Source}；目标 {Destination}",
+                    item.Name, GetLogSource(file.Source.AbsoluteUri), path);
                 Report(item with { Status = DownloadItemStatus.Failed, Error = "下载目标已存在。" });
                 return;
             }
@@ -190,6 +194,9 @@ public sealed partial class DownloadManagementService(ILogger<DownloadManagement
         catch (Exception error) when (error is HttpRequestException or IOException or UnauthorizedAccessException
             or OperationCanceledException or ArgumentException or NotSupportedException)
         {
+            logger.LogError(error, "下载失败：{DownloadId}/{DownloadItemId}；文件 {FileName}；来源 {Source}；目标 {Destination}；已下载 {DownloadedBytes}/{TotalBytes} 字节",
+                job.Id, item.Id, item.Name, GetLogSource(file.Source.AbsoluteUri), path,
+                item.DownloadedBytes, item.TotalBytes);
             var message = error switch
             {
                 HttpRequestException { StatusCode: { } code } => $"服务器返回 HTTP {(int)code}。",

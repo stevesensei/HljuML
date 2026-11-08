@@ -10,6 +10,8 @@ public static class LauncherPaths
 
     public static string JavaSettingsPath => Path.Combine(ColorMcDirectory, "java-settings.json");
 
+    public static string LogDirectory => Path.Combine(Path.GetDirectoryName(DatabasePath)!, "logs");
+
     public static bool IsDefaultInstanceDirectory(string path) => GameFolderPathsEqual(path, DefaultInstanceDirectory);
 
     internal static bool GameFolderPathsEqual(string first, string second) =>

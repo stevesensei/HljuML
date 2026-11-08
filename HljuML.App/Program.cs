@@ -3,8 +3,10 @@ using System;
 using System.Threading;
 using Avalonia.Controls;
 using HljuML.App.Core;
+using HljuML.Core.Infrastructure.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using TKCode.Arc;
 
 namespace HljuML.App;
@@ -21,6 +23,8 @@ class Program
         {
             DisableDefaults = true
         });
+        builder.Logging.AddProvider(new LauncherFileLoggerProvider());
+        builder.Logging.AddDebug();
         builder.Services.AddCommonServices();
 
         using var host = builder.Build();

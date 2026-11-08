@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using ColorMC.Core.Objs;
 using HljuML.Core.GamePlay;
@@ -47,7 +48,7 @@ public sealed partial class GameDownloadViewModel
         ? $"Minecraft {SelectedVersion?.Id} · {_selectedLoader} {_selectedLoaderVersion?.Label}"
         : $"Minecraft {SelectedVersion?.Id} · 原版";
     public IReadOnlyList<SelectOption> LoaderVersions { get; private set; } = [];
-    public string InstanceIcon => $"avares://HljuML.App/Assets/loaders/{(_selectedLoader == Loaders.Normal ? "minecraft" : _selectedLoader.ToString().ToLowerInvariant())}.png";
+    public Bitmap InstanceIcon => GameLoaderIcons.Get(_selectedLoader);
     public string? NameError => string.IsNullOrWhiteSpace(_instanceName) ? "请输入实例名称。"
         : _instanceName.Length > 128 || _instanceName.Any(char.IsControl) ? "名称最多 128 个字符，不能包含控制字符。" : null;
     public bool CanInstall => CanEditConfiguration && SelectedVersion is not null && NameError is null
